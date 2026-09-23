@@ -75,9 +75,11 @@ class TaskRunService:
             state.graph.nodes.append(GraphNode(id="draft", kind="assertion", label=ctx["sources"]["draft"], source_ids=["draft"], status="user_supplied"))
             state.graph.edges.append(GraphEdge(source="world", target="draft", label="основан на"))
         candidates = [k for k in QUESTIONS if k not in ctx["answers"] and not ctx["base"].fields[FieldName(k)].value]
-        if ctx["round"] < 2 and candidates:
+        if ctx["round"] < 2 and (len(candidates) >= 3 or ctx["round"] == 0):
             ctx["round"] += 1
-            selected = candidates[:5]
+            selected = candidates[:4] if len(candidates) == 7 else candidates[:5]
+            if len(selected) < 3:
+                selected += [k for k in QUESTIONS if k not in selected][:3-len(selected)]
             state.pending_questions = []
             for field in selected:
                 node_id = f"gap:{field}"
@@ -104,9 +106,14 @@ class TaskRunService:
         task = self.store.get_task(task_id)
         if task.revision != ctx["revision"]:
             raise ValueError("Task changed; run is stale")
+        changed = False
         for name, proposal in card.fields.items():
             if name != FieldName.contact and proposal.value and task.card.fields[name].status not in {"edited", "confirmed"}:
+                changed = changed or task.card.fields[name].value != proposal.value
                 task.card.fields[name] = proposal.model_copy(update={"status": "ai_proposed"})
+        if changed and task.status == "published":
+            task.status = "draft"
+            task.published_at = None
         task.sources.update(ctx["sources"])
         task.revision += 1
         self.store.save_task(task)

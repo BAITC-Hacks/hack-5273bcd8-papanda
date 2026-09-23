@@ -39,6 +39,21 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state.calls,0)
         self.assertFalse(any(f.status=="confirmed" for f in state.card_draft.fields.values()))
         with self.assertRaises(ValueError): await self.service.submit_answers("t",old)
+    async def test_ai_changes_unpublish_but_preserve_manual_fields(self):
+        from app.contracts import FieldName
+        self.store.task.status="published"
+        self.store.task.published_at="now"
+        self.store.task.card.fields[FieldName.contact]=CardField(value="private@example.test",status="confirmed")
+        self.store.task.card.fields[FieldName.title]=CardField(value="Мой заголовок",status="edited")
+        self.service.start("t","stub"); await self.advance()
+        self.assertNotIn("private@example.test",str(self.service.contexts["t"]["sources"]))
+        while self.service.get("t").status=="waiting_answers":
+            self.assertGreaterEqual(len(self.service.get("t").pending_questions),3)
+            await self.service.submit_answers("t",[Answer(answer_id=q.answer_id,answer="Новые сведения") for q in self.service.get("t").pending_questions]); await self.advance()
+        self.assertEqual(self.store.task.status,"draft")
+        self.assertEqual(self.store.task.card.fields[FieldName.contact].value,"private@example.test")
+        self.assertEqual(self.store.task.card.fields[FieldName.title].value,"Мой заголовок")
+
     async def test_stale_question_ids(self):
         self.service.start("t", "stub"); await self.advance()
         with self.assertRaises(ValueError): await self.service.submit_answers("t", [Answer(answer_id="stale", answer="x")])
