@@ -20,6 +20,6 @@ def contract():
         "examples": {"kind": "executed_local_validator_example_not_live_model_trace", "sources": sources,
                      "accepted": valid.model_dump(), "rejected": invalid.model_dump()},
         "validation": {"accepted_passed": True, "rejection": rejected, "human_confirmation_required": True,
-                       "max_question_rounds": 2, "max_model_calls": 12, "max_world_revisions": 2,
+                       "max_question_rounds": 2, "max_corrections_per_run": 1, "run_timeout_seconds_default": 900, "trace": "data/traces/<run_id>.jsonl: actual events; no fabricated model traces", "max_model_calls": 12, "max_world_revisions": 2,
                        "time_budget": "180s cumulative provider time by default; human waiting excluded; configurable up to 240s",
-                       "configuration": ["OPENAI_API_KEY", "AI_ACTOR_MODEL", "AI_JUDGE_MODEL", "OPENAI_BASE_URL", "AI_ACTOR_API_KEY", "AI_JUDGE_API_KEY", "AI_ACTOR_BASE_URL", "AI_JUDGE_BASE_URL"], "stub": "Deterministic field-gap questions; no LLM or contradiction analysis"}}
+                       "configuration": ["OPENAI_API_KEY", "AI_ACTOR_MODEL", "AI_JUDGE_MODEL", "OPENAI_BASE_URL", "AI_ACTOR_API_KEY", "AI_JUDGE_API_KEY", "AI_ACTOR_BASE_URL", "AI_JUDGE_BASE_URL", "AI_RUN_TIMEOUT", "AI_TRACE_DIR"], "stub": "Deterministic field-gap questions; no LLM or contradiction analysis"}}

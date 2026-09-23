@@ -54,8 +54,41 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ,ENV),patch.object(engine.httpx,"AsyncClient",Client):
             service.start("t","engine"); await service.jobs["t"]
         self.assertEqual(service.get("t").status,"error")
+        self.assertEqual(service.get("t").stop_reason,"schema_error")
+        self.assertEqual(service.get("t").calls,2)
         self.assertIsNone(service.get("t").card_draft)
         self.assertNotIn("test-secret",service.get("t").error)
+        await service.close()
+
+    async def test_single_card_source_correction_uses_actual_failure(self):
+        service=TaskRunService(Store())
+        attempts=[]
+        async def fake_call(s, tid, role, instruction, schema, payload):
+            s.runs[tid].calls+=1
+            if schema is engine.World: return make_world()
+            if schema is engine.Judgment: return engine.Judgment(accepted=["data","users","constraints"],explanation="gaps")
+            if schema is engine.Questions: return engine.Questions(questions=[engine.Ask(candidate_id=k,question=f"Уточните {k}?") for k in ["data","users","constraints"]])
+            if schema is Card:
+                attempts.append(payload)
+                card=Card(); quote=payload["sources"]["draft"]
+                card.fields[FieldName.context]=CardField(value=quote if len(attempts)>1 else quote+" 2025",sources=[Source(source_id="draft",quote=quote)])
+                return card
+            return engine.CardJudgment(accepted=True,explanation="valid")
+        with patch.dict(os.environ,ENV),patch.object(engine,"call",fake_call):
+            service.start("t","engine");await service.jobs["t"]
+            await service.submit_answers("t",[Answer(answer_id=q.answer_id,answer="Ответ") for q in service.get("t").pending_questions]);await service.jobs["t"]
+            self.assertEqual(service.get("t").status,"card_ready")
+            self.assertEqual(len(attempts),2)
+            self.assertIn("Value must equal",attempts[1]["correction"]["failure"])
+            self.assertEqual(service.contexts["t"]["corrections"],1)
+        await service.close()
+
+    async def test_semantic_rejection_correction_is_bounded(self):
+        from app.ai.events import SemanticRejection
+        service=TaskRunService(Store());service.start("t","stub");await service.jobs["t"]
+        engine.reserve_correction(service,"t",{"kind":"semantic","failure":"wrong field"})
+        with self.assertRaises(SemanticRejection):
+            engine.reserve_correction(service,"t",{"kind":"semantic","failure":"still wrong"})
         await service.close()
 
     async def test_call_budget_enforced_before_http(self):

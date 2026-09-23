@@ -1,5 +1,10 @@
 import asyncio
 import unittest
+import os
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 from app.ai.service import TaskRunService
 from app.ai.validation import validate_field
 from app.contracts import Task, CardField, Source, Answer
@@ -53,6 +58,36 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.task.status,"draft")
         self.assertEqual(self.store.task.card.fields[FieldName.contact].value,"private@example.test")
         self.assertEqual(self.store.task.card.fields[FieldName.title].value,"Мой заголовок")
+
+    async def test_human_wait_expires_without_polling(self):
+        with patch.dict(os.environ,{"AI_RUN_TIMEOUT":"0.02"}):
+            self.service.start("t","stub"); await self.advance()
+            self.assertEqual(self.service.get("t").status,"waiting_answers")
+            await asyncio.sleep(0.08)
+            self.assertEqual(self.service.runs["t"].stop_reason,"run_timeout")
+            self.assertEqual(self.service.runs["t"].status,"error")
+
+    async def test_explicit_answer_revises_confirmed_field(self):
+        from app.contracts import Card, FieldName
+        self.store.task.card.fields[FieldName.data]=CardField(value="Данных нет",status="confirmed")
+        self.service.start("t","stub");await self.advance()
+        ctx=self.service.contexts["t"]
+        ctx["sources"]["new_answer"]="Данные появились"
+        ctx["answers"]["data"]="new_answer"
+        card=Card();card.fields[FieldName.data]=CardField(value="Данные появились",sources=[Source(source_id="new_answer",quote="Данные появились")])
+        self.service._commit("t",card)
+        self.assertEqual(self.store.task.card.fields[FieldName.data].value,"Данные появились")
+        self.assertEqual(self.store.task.card.fields[FieldName.data].status,"ai_proposed")
+
+    async def test_trace_has_actual_state_and_redacts_credentials(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{"AI_TRACE_DIR":directory,"OPENAI_API_KEY":"sentinel-secret"}):
+            self.store.task.text="Описание sentinel-secret"
+            state=self.service.start("t","stub");await self.advance()
+            content=(Path(directory)/f"{state.run_id}.jsonl").read_text(encoding="utf-8")
+            self.assertNotIn("sentinel-secret",content)
+            events=[json.loads(line) for line in content.splitlines()]
+            self.assertEqual(events[0]["event"],"run_started")
+            self.assertEqual(events[-1]["state"]["status"],"waiting_answers")
 
     async def test_stale_question_ids(self):
         self.service.start("t", "stub"); await self.advance()

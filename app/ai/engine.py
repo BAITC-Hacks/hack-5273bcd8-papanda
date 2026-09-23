@@ -8,10 +8,11 @@ import json
 import os
 import time
 import httpx
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.contracts import Card, CardField, Source, GraphNode, GraphEdge, Question, FieldName, FIELD_WEIGHTS
 from .prompts import SYSTEM
 from .validation import validate_field, validate_card
+from .events import emit, SchemaFailure, SourceFailure, SemanticRejection, BudgetExhausted
 
 class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -68,11 +69,12 @@ async def call(service, task_id, role, instruction, schema, payload):
     max_seconds = min(240.0, max(1.0, float(os.getenv("AI_MAX_SECONDS", "180"))))
     spent = ctx.get("provider_seconds", 0.0)
     if state.calls >= max_calls or spent >= max_seconds:
-        raise ValueError("Hard model call/time budget exhausted")
+        raise BudgetExhausted("Hard model call/time budget exhausted")
     model = actor if role == "actor" else judge
     key = os.getenv(f"AI_{role.upper()}_API_KEY", os.getenv("OPENAI_API_KEY", ""))
     base_url = os.getenv(f"AI_{role.upper()}_BASE_URL", os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"))
     state.calls += 1
+    emit(service, task_id, "model_request", role=role, model=model, stage=instruction.split(":")[0], input=payload, call=state.calls)
     started = time.monotonic()
     try:
         async with asyncio.timeout(max_seconds - spent), httpx.AsyncClient(timeout=min(45.0, max_seconds - spent)) as client:
@@ -86,10 +88,33 @@ async def call(service, task_id, role, instruction, schema, payload):
             for name, value in result.get("usage", {}).items():
                 if isinstance(value, int) and not isinstance(value, bool):
                     state.tokens[name] = state.tokens.get(name, 0) + value
-            content = result["choices"][0]["message"]["content"]
-            return schema.model_validate_json(content)
+            try:
+                content = result["choices"][0]["message"]["content"]
+            except (KeyError, IndexError, TypeError) as exc:
+                raise SchemaFailure("Provider returned no choices/message/content") from exc
+            emit(service, task_id, "model_response", role=role, output=content, usage=result.get("usage", {}))
     finally:
         ctx["provider_seconds"] = spent + time.monotonic() - started
+    try:
+        parsed = schema.model_validate_json(content)
+    except (ValidationError, ValueError, TypeError) as exc:
+        evidence = {"kind": "schema", "failure": str(exc), "invalid_output": content}
+        emit(service, task_id, "validation_failed", **evidence)
+        reserve_correction(service, task_id, evidence)
+        return await call(service, task_id, role, instruction + " CORRECTION: repair JSON using the actual validation error; do not add business facts.", schema,
+                          {**payload, "correction": evidence})
+    emit(service, task_id, "schema_validation_passed", schema=schema.__name__)
+    return parsed
+
+
+def reserve_correction(service, task_id, evidence):
+    ctx = service.contexts[task_id]
+    if ctx.get("corrections", 0) >= 1:
+        kind = evidence.get("kind")
+        error = SemanticRejection if kind == "semantic" else SourceFailure if kind == "source" else SchemaFailure
+        raise error("One correction was already attempted; validation still fails")
+    ctx["corrections"] = 1
+    emit(service, task_id, "correction_requested", evidence=evidence)
 
 
 def validate_world(world, sources):
@@ -144,7 +169,11 @@ async def advance(service, task_id):
                "answered_fields": list(ctx["answers"])}
     world = await call(service, task_id, "actor",
         "BUILD_WORLD then DEVELOP_OPPOSITION. Assertions must be exact cited user quotations. Business need and student prerequisites are explicitly interpretations. Discover missing prerequisites, ambiguity or actual conflicting assertions. Never force contradictions. Include useful gap candidates if information is missing. Do not ask personal/contact questions. Reassess previous world against new answers; do not repeat answered-field questions.", World, payload)
-    validate_world(world, ctx["sources"])
+    try:
+        validate_world(world, ctx["sources"])
+    except ValueError as exc:
+        emit(service, task_id, "validation_failed", kind="source", failure=str(exc))
+        raise SourceFailure(str(exc)) from exc
     judgment = await call(service, task_id, "judge",
         "JUDGE candidates: accept only useful, source-grounded gaps/ambiguities or plausible contradictions. Do not invent contradiction for scoring. Return accepted candidate IDs only and a short methodological explanation.", Judgment,
         {"sources": ctx["sources"], "world": world.model_dump()})
@@ -152,6 +181,7 @@ async def advance(service, task_id):
     if len(judgment.accepted) != len(set(judgment.accepted)) or not set(judgment.accepted) <= set(candidate_map):
         raise ValueError("Judge referenced unknown candidates")
     prefix = graph_world(state, world, judgment.accepted, revision)
+    emit(service, task_id, "world_revision", revision=revision, graph=state.graph.model_dump(), judgment=judgment.model_dump())
     ctx["world"] = world.model_dump()
     ctx["world_revision"] = revision + 1
     eligible = {cid: candidate_map[cid] for cid in judgment.accepted if candidate_map[cid].field.value not in ctx["answers"]}
@@ -175,13 +205,27 @@ async def advance(service, task_id):
         return
     if ctx["round"] == 0:
         raise ValueError("Initial analysis did not produce at least three grounded questions")
-    card = await call(service, task_id, "actor",
-        "COMMIT_CARD: extract only exact user quotations into appropriate fields. Concatenate multiple cited quotes using spaces. No paraphrasing, invented title or inferred numbers. Missing/conflicting facts stay empty. Contact must be empty. Every nonempty value must have citations and status ai_proposed. Human confirmation happens later.", Card,
-        {"sources": ctx["sources"], "world": world.model_dump()})
-    validate_card(card, ctx["sources"])
-    review = await call(service, task_id, "judge",
-        "REASSESS proposed card. Check field relevance, unresolved contradictions and faithfully represented answers. Reject inappropriate assignments or unsupported interpretation. Citations prove source provenance, not objective truth. Do not require missing information to be invented.", CardJudgment,
-        {"sources": ctx["sources"], "world": world.model_dump(), "card": card.model_dump()})
-    if not review.accepted:
-        raise ValueError("Judge rejected card; human review required")
+    card_payload = {"sources": ctx["sources"], "world": world.model_dump()}
+    while True:
+        card = await call(service, task_id, "actor",
+            "COMMIT_CARD: extract only exact user quotations into appropriate fields. Concatenate multiple cited quotes using spaces. No paraphrasing, invented title or inferred numbers. Missing/conflicting facts stay empty. Contact must be empty. Every nonempty value must have citations and status ai_proposed. Human confirmation happens later. If correction evidence exists, correct only its identified failure.", Card,
+            card_payload)
+        try:
+            validate_card(card, ctx["sources"])
+        except ValueError as exc:
+            evidence = {"kind": "source", "failure": str(exc), "invalid_output": card.model_dump()}
+            emit(service, task_id, "validation_failed", **evidence)
+            reserve_correction(service, task_id, evidence)
+            card_payload = {**card_payload, "correction": evidence}
+            continue
+        emit(service, task_id, "card_source_validation_passed", card=card.model_dump())
+        review = await call(service, task_id, "judge",
+            "REASSESS proposed card. Check field relevance, unresolved contradictions and faithfully represented answers. Reject inappropriate assignments or unsupported interpretation. Citations prove source provenance, not objective truth. Do not require missing information to be invented.", CardJudgment,
+            {"sources": ctx["sources"], "world": world.model_dump(), "card": card.model_dump()})
+        emit(service, task_id, "card_semantic_judgment", judgment=review.model_dump())
+        if review.accepted:
+            break
+        evidence = {"kind": "semantic", "failure": review.explanation, "invalid_output": card.model_dump()}
+        reserve_correction(service, task_id, evidence)
+        card_payload = {**card_payload, "correction": evidence}
     service._commit(task_id, card)

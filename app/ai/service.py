@@ -6,6 +6,7 @@ from uuid import uuid4
 from app.contracts import (Answer, Card, CardField, FieldName, FIELD_WEIGHTS,
     GraphNode, GraphEdge, Question, RunState, Source)
 from .validation import validate_card
+from .events import emit, SchemaFailure, SourceFailure, SemanticRejection, BudgetExhausted
 
 QUESTIONS = {
     "need": "Что именно нужно изменить в текущей работе?",
@@ -24,10 +25,38 @@ class TaskRunService:
         self.runs = {}
         self.contexts = {}
         self.jobs = {}
+        self.deadlines = {}
 
     def get(self, task_id):
         self.store.get_task(task_id)
+        self._expire(task_id)
         return self.runs.get(task_id, RunState(task_id=task_id))
+
+    def _expire(self, task_id):
+        state = self.runs.get(task_id)
+        ctx = self.contexts.get(task_id)
+        if state and ctx and state.status in {"analyzing", "building_card", "waiting_answers"} and time.monotonic() < ctx["deadline"]:
+            # Windows event-loop clock resolution can invoke a timer slightly early.
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop:
+                handle = self.deadlines.get(task_id)
+                if handle:
+                    handle.cancel()
+                self.deadlines[task_id] = loop.call_later(
+                    max(0.02, ctx["deadline"] - time.monotonic()), self._expire, task_id)
+        if state and ctx and state.status in {"analyzing", "building_card", "waiting_answers"} and time.monotonic() >= ctx["deadline"]:
+            state.status = "error"
+            state.stop_reason = "run_timeout"
+            state.error = "Время анализа истекло, включая ожидание ответов. Запустите новый анализ."
+            state.pending_questions = []
+            state.elapsed_seconds = round(time.monotonic() - ctx["started"], 3)
+            job = self.jobs.get(task_id)
+            if job and not job.done():
+                job.cancel()
+            emit(self, task_id, "run_expired", state=state.model_dump())
 
     def start(self, task_id, mode=None):
         task = self.store.get_task(task_id)
@@ -46,7 +75,12 @@ class TaskRunService:
             if name != FieldName.contact and field.value and field.status in {"edited", "confirmed"}:
                 sources[f"field:{name.value}"] = field.value
         self.contexts[task_id] = dict(sources=sources, round=0, revision=task.revision,
-            started=time.monotonic(), answers={}, base=task.card.model_copy(deep=True))
+            started=time.monotonic(), deadline=time.monotonic() + max(0.01, float(os.getenv("AI_RUN_TIMEOUT", "900"))), answers={}, base=task.card.model_copy(deep=True))
+        if task_id in self.deadlines:
+            self.deadlines[task_id].cancel()
+        self.deadlines[task_id] = asyncio.get_running_loop().call_later(
+            max(0.0, self.contexts[task_id]["deadline"] - time.monotonic()), self._expire, task_id)
+        emit(self, task_id, "run_started", state=state.model_dump())
         self.jobs[task_id] = asyncio.create_task(self._advance(task_id))
         return state
 
@@ -62,11 +96,17 @@ class TaskRunService:
             raise
         except Exception as exc:
             state.status = "error"
-            state.stop_reason = "validation_or_provider_error"
+            state.stop_reason = ("schema_error" if isinstance(exc, SchemaFailure) else
+                "source_validation_error" if isinstance(exc, SourceFailure) else
+                "semantic_judge_rejection" if isinstance(exc, SemanticRejection) else
+                "budget_exhausted" if isinstance(exc, BudgetExhausted) else
+                "validation_error" if isinstance(exc, ValueError) else "provider_error")
+            emit(self, task_id, "run_error", kind=state.stop_reason, exception_type=type(exc).__name__)
             # Do not expose provider response/body or credentials.
             state.error = f"Анализ остановлен ({type(exc).__name__}). Исправьте ввод или проверьте настройки API."
         finally:
             state.elapsed_seconds = round(time.monotonic() - ctx["started"], 3)
+            emit(self, task_id, "state_transition", state=state.model_dump())
 
     def _stub(self, task_id):
         state, ctx = self.runs[task_id], self.contexts[task_id]
@@ -102,14 +142,21 @@ class TaskRunService:
 
     def _commit(self, task_id, card):
         state, ctx = self.runs[task_id], self.contexts[task_id]
+        self._expire(task_id)
+        if state.status == "error":
+            raise ValueError("Run expired before commit")
         validate_card(card, ctx["sources"])
+        emit(self, task_id, "card_source_validation_passed", card=card.model_dump())
         task = self.store.get_task(task_id)
         if task.revision != ctx["revision"]:
             raise ValueError("Task changed; run is stale")
         changed = False
         for name, proposal in card.fields.items():
-            if name != FieldName.contact and proposal.value and task.card.fields[name].status not in {"edited", "confirmed"}:
+            answered = name.value in ctx["answers"]
+            if name != FieldName.contact and proposal.value and (answered or task.card.fields[name].status not in {"edited", "confirmed"}):
                 changed = changed or task.card.fields[name].value != proposal.value
+                if answered and task.card.fields[name].value != proposal.value:
+                    emit(self, task_id, "human_answer_revises_field", field=name.value, previous=task.card.fields[name].model_dump(), proposal=proposal.model_dump())
                 task.card.fields[name] = proposal.model_copy(update={"status": "ai_proposed"})
         if changed and task.status == "published":
             task.status = "draft"
@@ -142,12 +189,15 @@ class TaskRunService:
             state.graph.nodes.append(GraphNode(id=source_id, kind="assertion", label=answer.answer or "Ответ не предоставлен", source_ids=[source_id], status="user_supplied"))
             if q.node_id:
                 state.graph.edges.append(GraphEdge(source=source_id, target=q.node_id, label="ответ пользователя"))
+        emit(self, task_id, "human_answers_received", answers=[a.model_dump() for a in answers], graph=state.graph.model_dump())
         state.pending_questions = []
         state.status = "building_card"
         self.jobs[task_id] = asyncio.create_task(self._advance(task_id))
         return state
 
     async def close(self):
+        for handle in self.deadlines.values():
+            handle.cancel()
         for job in self.jobs.values():
             if not job.done():
                 job.cancel()
