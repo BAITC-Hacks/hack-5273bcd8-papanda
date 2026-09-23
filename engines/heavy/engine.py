@@ -176,6 +176,7 @@ class HeavyEngine:
         try:
             result = await asyncio.wait_for(client.generate(messages, json_schema=schema, max_tokens=2200, timeout=timeout), timeout=timeout)
         except asyncio.TimeoutError as exc:
+            self._publish(run, "llm_call", role=role, duration_s=time.monotonic()-started, success=False, error="timeout")
             if run.elapsed() >= self.deadline_s:
                 raise StopRun("deadline", "Истёк бюджет времени анализа") from exc
             raise ProviderError("Превышено время ожидания модели") from exc

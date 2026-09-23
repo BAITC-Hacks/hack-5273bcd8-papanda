@@ -325,3 +325,25 @@ async def test_time_and_iteration_budgets(kwargs, reason):
     rid = await engine.start(req())
     view = await until(engine, rid, {"failed"})
     assert view.stop_reason == reason and view.card is None
+
+
+def test_question_round_cap_after_revisions_and_complete_needs_practice():
+    s = planning_state()
+    assert "COMPLETE" not in Resolver.allowed(s)
+    for round_number in range(2):
+        roadmap = s.roadmaps[s.current_map]
+        pid = roadmap["execution_process_ids"][0]
+        s = commit(Move(move="ASK_BUSINESS", payload={"origin_process_id": pid, "expectation": "Уточнить сведения"}), s)
+        aid = next(reversed(s.actions))
+        s = observe(s, aid, True, {"answers": [{"question_id": q, "text": "не знаю"} for q in roadmap["question_ids"]]})
+        oid = next(reversed(s.observations))
+        s = commit(Move(move="ASSESS_PRACTICE", payload={"observation_id": oid, "relation": "contradicted", "explanation": "Ожидание уточнения не подтвердилось", "consequence": "Пересмотреть карту"}), s)
+        s = commit(Move(move="REVISE_WORLD", payload={"observation_ids": [oid], "reason": "Сведения остаются неизвестными"}), s)
+        s = commit(Move.model_validate(script()[5]), s)
+        rid = next(reversed(s.resolutions))
+        s = commit(Move(move="BEGIN_EXECUTION", payload={"resolution_ids": [rid]}), s)
+    assert s.rounds == 2
+    assert "ASK_BUSINESS" not in Resolver.allowed(s)
+    assert "COMMIT_CARD" in Resolver.allowed(s)
+    assert "COMPLETE" not in Resolver.allowed(s)
+    assert len(s.roadmaps) == 3
