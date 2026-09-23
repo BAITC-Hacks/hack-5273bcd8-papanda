@@ -94,11 +94,11 @@ def test_end_to_end_stub_and_manual_provenance(tmp_path):
         assert result["sources"][contact_source["source_id"]] == VALUES["contact"]
         revision = result["revision"]
         assert client.post(f"/api/tasks/{tid}/publish").status_code == 200
-        assert client.get("/api/catalog?level=priority&topic=Образ").json()[0]["id"] == tid
+        assert tid in {item["id"] for item in client.get("/api/catalog?level=priority&topic=Образ").json()}
         result = client.put(f"/api/tasks/{tid}/card", json={"fields": {"need": {"value": "Изменённая потребность бизнеса для студентов", "confirmed": False}}}).json()
         assert result["status"] == "draft" and result["revision"] == revision + 1
         assert result["score"]["total"] == 90
-        assert client.get("/api/catalog").json() == []
+        assert tid not in {item["id"] for item in client.get("/api/catalog").json()}
         assert client.get("/api/does-not-exist").status_code == 404
     reopened = Store(str(tmp_path / "nested" / "test.db"))
     assert reopened.get_task(tid).revision == revision + 1
@@ -113,7 +113,7 @@ def test_low_score_unlimited_proposals_multiple_choices_and_stage(tmp_path):
         tid = client.post("/api/tasks", json={"text": "Короткая задача", "industry": "Образование"}).json()["id"]
         client.put(f"/api/tasks/{tid}/card", json={"fields": {"title": {"value": "Маленькая задача", "confirmed": True}}})
         assert client.post(f"/api/tasks/{tid}/publish").json()["score"]["total"] == 0
-        assert client.get("/api/catalog?level=draft").json()[0]["id"] == tid
+        assert tid in {item["id"] for item in client.get("/api/catalog?level=draft").json()}
         ids = []
         for team in ("one", "one", "two"):
             response = client.post(f"/api/tasks/{tid}/proposals", json={"team_id": team, "idea": "Сделаем прототип", "plan": "Исследуем и проверим", "deadline": "2 недели", "link": ""})
@@ -164,3 +164,58 @@ def test_catalog_sorting_and_filters():
     tasks = [task("low", 0, "2026-09-23"), task("old", 70, "2026-09-22"), task("new", 70, "2026-09-23"), task("hidden", 100, "2026-09-23", status="draft"), task("health", 20, "2026-09-23", industry="Health")]
     assert [t.id for t in catalog(tasks)] == ["new", "old", "health", "low"]
     assert [t.id for t in catalog(tasks, "educ")] == ["new", "old", "low"]
+
+
+def test_real_seed_integrity_and_idempotence(tmp_path):
+    store = Store(str(tmp_path / "seed.db"))
+    try:
+        store.seed()
+        tasks = store.list_tasks()
+        teams = store.list_teams()
+        published = [t for t in tasks if t.status == "published"]
+        assert len([t for t in tasks if t.status == "draft"]) >= 5
+        assert len(published) == 5
+        assert len(teams) >= 5
+        assert sorted(t.score.total for t in published) == [20, 50, 75, 100, 100]
+        team_ids = {t.id for t in teams}
+        proposals = [p for task in tasks for p in store.list_proposals(task.id)]
+        assert len(proposals) >= 5
+        assert all(p.team_id in team_ids for p in proposals)
+        for task in tasks:
+            assert task.sources.get("draft") == task.text
+            for field in task.card.fields.values():
+                if not field.value:
+                    continue
+                assert field.sources
+                for source in field.sources:
+                    assert source.source_id in task.sources
+                    assert source.quote in task.sources[source.source_id]
+        edited = teams[0]
+        edited.points += 10
+        store.save_team(edited)
+        store.seed()
+        assert len(store.list_tasks()) == len(tasks)
+        assert len(store.list_teams()) == len(teams)
+        assert sum(len(store.list_proposals(t.id)) for t in tasks) == len(proposals)
+        assert store.get_team(edited.id).points == edited.points
+    finally:
+        store.close()
+
+
+def test_database_environment_precedence(tmp_path, monkeypatch):
+    primary, legacy = tmp_path / "primary.db", tmp_path / "legacy.db"
+    monkeypatch.setenv("SANA_DB", str(primary))
+    monkeypatch.setenv("DB_PATH", str(legacy))
+    with TestClient(create_app(ai_mode="stub")) as client:
+        assert client.get("/api/health").status_code == 200
+    assert primary.exists()
+    assert not legacy.exists()
+
+
+def test_store_closed_after_application_shutdown(tmp_path):
+    import sqlite3
+    app = create_app(tmp_path / "closed.db", "stub")
+    with TestClient(app) as client:
+        assert client.get("/api/tasks").status_code == 200
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        app.state.store.list_tasks()

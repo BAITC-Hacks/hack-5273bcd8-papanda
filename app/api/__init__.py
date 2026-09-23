@@ -6,6 +6,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from dotenv import load_dotenv
 from app.contracts import (TaskCreate, AnalyzeRequest, AnswersRequest, CardUpdate,
                            ProposalCreate, DecisionRequest, StageRequest, CardField, Source)
 from app.catalog import catalog
@@ -16,20 +17,27 @@ ACTIVE = {"analyzing", "waiting_answers", "building_card"}
 
 def create_app(db_path=None, ai_mode=None):
     root = Path(__file__).resolve().parents[2]
+    load_dotenv(root / ".env")
     mode = ai_mode or os.getenv("AI_MODE", "stub")
     if mode not in {"stub", "engine"}:
         raise ValueError("AI_MODE must be stub or engine")
-    store = Store(str(db_path or os.getenv("DB_PATH", root / "data" / "sana.db")))
-    store.seed()
+    store = Store(str(db_path or os.getenv("SANA_DB") or os.getenv("DB_PATH") or root / "data" / "sana.db"))
+    try:
+        store.seed()
+    except Exception:
+        store.close()
+        raise
 
     @asynccontextmanager
     async def lifespan(app):
         try:
             yield
         finally:
-            if app.state.service is not None:
-                await app.state.service.close()
-            store.close()
+            try:
+                if app.state.service is not None:
+                    await app.state.service.close()
+            finally:
+                store.close()
 
     app = FastAPI(title="AI Sana Challenge Hub", version="0.1.0", lifespan=lifespan)
     app.state.store = store
@@ -168,4 +176,3 @@ def create_app(db_path=None, ai_mode=None):
         raise HTTPException(503, "Frontend is not built. Run npm run build in web.")
 
     return app
-
