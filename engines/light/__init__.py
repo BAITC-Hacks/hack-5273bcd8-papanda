@@ -1,0 +1,1 @@
+"""Fixed-pipeline dialectical engine."""
