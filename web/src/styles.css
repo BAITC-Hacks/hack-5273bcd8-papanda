@@ -5,3 +5,36 @@
 @media(max-width:540px){h1{font-size:26px}.page-heading{flex-wrap:wrap;gap:15px}.task-grid,.team-grid,.card-fields{grid-template-columns:1fr}.stats>div{padding:15px 11px}.stats strong{font-size:25px}.stats span{font-size:9px}.stats small{font-size:8px}.stats>div+div:before{top:15px;bottom:15px}.topbar>span{font-size:9px}.topbar>div{font-size:10px}.content{padding:24px 16px}.list-heading>.tiny{display:none}.task-tile h2{font-size:19px}.nav{font-size:9px}.nav b{display:none}.sidebar{padding:16px}.sidebar-bottom{flex-wrap:wrap}.team-select{width:100%;font-size:10px}.filters label{min-width:0;flex:1}.filters{gap:12px;padding:15px}.filters>span{width:100%;padding:0}.section-heading{gap:10px}.section-heading h2{font-size:16px}.read-card>div{grid-template-columns:1fr;gap:5px}.save-row .primary{width:100%}.analysis-actions{gap:12px}.analysis-actions>*{width:100%}.original p{font-size:12px}.panel{padding:17px}.rating .breakdown{grid-template-columns:1fr}.graph-heading{font-size:10px}.graph-heading small{font-size:8px}.graph-footer{gap:8px;flex-wrap:wrap}footer span{display:none}}
 
 .alert.warning{background:#fbf6e9;border:1px solid #e5d5aa;color:#806b3d}.alert.warning p{margin:7px 0 12px}.card-fields+.mode-note{margin-top:16px}
+.analysis{margin-top:20px;display:grid;gap:16px}
+.analysis h4{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#42604b;margin:0 0 8px}
+.analysis h4 small{text-transform:none;letter-spacing:0;font-weight:500;color:#98a18f;margin-left:6px}
+.analysis ul{margin:0;padding-left:18px;font-size:12px;line-height:1.6}
+.analysis-sides{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.analysis-sides section{background:#fafbf8;border:1px solid #e2e9dd;border-radius:9px;padding:12px 14px}
+.analysis ul.issues{list-style:none;padding:0;display:grid;gap:10px}
+.issue{background:#fff;border:1px solid #e0e7d9;border-left:3px solid #c4b276;border-radius:7px;padding:11px 13px;scroll-margin-top:30px}
+.issue.done{border-left-color:#3e8b63}
+.issue:target{outline:2px solid #669870}
+.issue-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.issue-head b{font-size:12px;font-weight:600}
+.badge{font-size:10px;white-space:nowrap;border-radius:10px;padding:1px 8px;background:#fbf4e2;color:#8a7b51}
+.badge.done{background:#e8f3ec;color:#3e8b63}
+.issue-q,.issue-a{font-size:11px;color:#5d6b58;margin-top:6px}
+.issue-a{margin-left:12px}
+.issue-q>span,.issue-a>span{font-weight:700;color:#8b9a82;margin-right:6px}
+.progress{margin-top:18px;border:1px solid #d9e6dc;background:#f3f8f4;border-radius:9px;padding:14px 16px}
+.progress-head{display:flex;align-items:center;gap:10px;font-weight:700;font-size:12px;color:#42604b}
+.progress-head small{margin-left:auto;font-weight:500;color:#90a087}
+.progress ol{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px;font-size:12px}
+.progress li{color:#9aa796}
+.progress li.done{color:#3e8b63}
+.progress li.active{color:#25332e;font-weight:600;animation:pulse-text 1.4s infinite}
+.spinner{width:14px;height:14px;border:2px solid #cfe0d4;border-top-color:#3e8b63;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse-text{50%{opacity:.55}}
+.rating .breakdown .crit{display:grid;grid-template-columns:16px 1fr auto;align-items:start;gap:8px;font-size:11px}
+.crit .mark{font-size:12px;line-height:1.4}
+.crit.full .mark{color:#3e8b63}.crit.part .mark{color:#c49a4a}.crit.none .mark{color:#b9c2b3}
+.crit-text span{display:block;font-weight:600;color:#25332e}
+.crit-text small{display:block;font-size:10px;line-height:1.4;margin-top:2px}
+@media (max-width:700px){.analysis-sides{grid-template-columns:1fr}}

@@ -204,10 +204,11 @@ class LightEngine:
         state.graph.edges=[]
         for side,elements,parent in [("simplest",proposal.simplest.elements,"P1"),("opposite",proposal.opposite.elements,"P2")]:
             for e in elements:
-                state.graph.nodes.append(GraphNode(id=e.id,kind="element",label=e.statement,side=side))
+                label=f"«{e.quote.strip()}»" if side=="simplest" else e.statement
+                state.graph.nodes.append(GraphNode(id=e.id,kind="element",label=label,side=side))
                 state.graph.edges.append(GraphEdge(source=parent,target=e.id,kind="develops"))
         for c in proposal.contradictions:
-            state.graph.nodes.append(GraphNode(id=c.id,kind="contradiction",label=c.statement,status="open"))
+            state.graph.nodes.append(GraphNode(id=c.id,kind="gap" if c.kind=="gap" else "contradiction",label=c.statement,status="open"))
             for ref in c.simplest_refs+c.opposite_refs: state.graph.edges.append(GraphEdge(source=ref,target=c.id,kind="contradicts"))
         self._event(run_id,"committed",stage="ANALYZE")
 

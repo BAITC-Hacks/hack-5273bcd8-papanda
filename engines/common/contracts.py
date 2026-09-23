@@ -48,7 +48,7 @@ class CardDraft(BaseModel):
 
 class GraphNode(BaseModel):
     id: str
-    kind: Literal["simplest", "opposite", "element", "contradiction", "question", "answer", "field"]
+    kind: Literal["simplest", "opposite", "element", "gap", "contradiction", "question", "answer", "field"]
     label: str
     status: Literal["open", "resolved", "reopened", "rejected", "ok"] | None = None
     side: Literal["simplest", "opposite"] | None = None

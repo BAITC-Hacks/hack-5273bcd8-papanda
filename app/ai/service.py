@@ -169,7 +169,7 @@ class TaskRunService:
         state.status = "error" if view.status in {"failed", "cancelled"} else view.status
         state.pending_questions = [Question(
             answer_id=q.question_id, field=FieldName(q.field), question=q.text,
-            why=q.why, points_at_stake=q.points_at_stake, node_id=q.question_id,
+            why=q.why, points_at_stake=q.points_at_stake, node_id=q.contradiction_id,
         ) for q in view.pending_questions]
         state.graph = Graph(
             # Elements carry their side; keep it visible as business fact vs team need.
