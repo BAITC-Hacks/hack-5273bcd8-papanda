@@ -52,6 +52,31 @@ def test_contact(value, valid):
     assert field_points(FieldName.contact, value, True)[0] == (5 if valid else 0)
 
 
+@pytest.mark.parametrize("value", [
+    "Данные отсутствуют, CSV пока недоступен",
+    "Данные будут собраны позднее в таблицу",
+    "Нет доступа к CSV файлу с историей заявок",
+    "CSV выгрузка пока не доступна студентам",
+    "Планируем собрать данные в таблицу после старта",
+    "Будем собирать историю обращений в CSV",
+    "Предстоит получить отчёты о продажах магазина",
+    "Часть данных недоступна, доступен CSV с примерами",
+])
+def test_unavailable_future_and_ambiguous_materials_do_not_score(value):
+    points, reason = field_points(FieldName.data, value, True)
+    assert points == 0
+    assert "уже доступный" in reason
+
+
+@pytest.mark.parametrize("value", [
+    "Доступна CSV выгрузка истории заявок клиентов",
+    "Есть таблица продаж и примеры чеков за месяц",
+    "Передадим готовый CSV файл истории обращений",
+])
+def test_available_materials_score(value):
+    assert field_points(FieldName.data, value, True)[0] == 20
+
+
 @pytest.mark.parametrize("names,level,total", [([], "draft", 0), (["data", "context", "need"], "working", 40), (["data", "context", "need", "expected_result", "success_criteria"], "ready", 70), (["data", "context", "need", "expected_result", "success_criteria", "users", "constraints"], "priority", 90)])
 def test_level_boundaries(names, level, total):
     card = full_card("edited")

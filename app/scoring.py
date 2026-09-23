@@ -13,8 +13,21 @@ def contact_valid(value: str) -> bool:
 
 
 def data_available(value: str) -> bool:
+    """Require current materials, conservatively rejecting mixed availability.
+
+    Format names alone do not establish availability. A statement mentioning
+    unavailable or planned materials must be clarified before awarding points.
+    """
     lower = value.casefold()
-    if re.search(r"(?:данных|материалов|источников)\s+(?:пока\s+)?нет|нет\s+(?:данных|материалов)|^нет[.!\s]*$", lower):
+    unavailable = (
+        r"(?:данных|материалов|источников)\s+(?:пока\s+)?нет"
+        r"|нет\s+(?:данных|материалов|доступа|источников)"
+        r"|отсутств\w*|недоступ\w*|не\s+доступ\w*|не\s+предостав\w*"
+        r"|(?:будут|будет|будем)\s+(?:собран\w*|собират\w*|подготов\w*|предостав\w*|доступ\w*)"
+        r"|(?:планиру\w*|предстоит)\s+(?:собра\w*|собират\w*|подготов\w*|получ\w*|предостав\w*)"
+        r"|^нет[.!\s]*$"
+    )
+    if re.search(unavailable, lower):
         return False
     return bool(re.search(r"csv|xlsx?|json|pdf|api|https?://|таблиц|выгруз|опрос|интервью|пример|источник|документ|истори|лог[иов]|запис|файл|баз[ауы]|отч[её]т|каталог|скан|текст|датасет|dataset|crm", lower))
 
@@ -40,7 +53,7 @@ def field_points(name: FieldName, value: str, confirmed: bool) -> tuple[float, s
     if not meaningful(value):
         return 0, "Опишите конкретнее: минимум 20 символов"
     if name == FieldName.data and not data_available(value):
-        return 0, "Назовите доступный источник, формат или пример данных; отсутствие данных не даёт баллов"
+        return 0, "Назовите уже доступный источник, формат или пример; недоступные, будущие или неоднозначно доступные материалы не дают баллов"
     if name == FieldName.constraints and not bounded(value):
         return 0, "Укажите срок, технологию, доступ или другую конкретную границу"
     if name == FieldName.success_criteria and not measurable(value):
