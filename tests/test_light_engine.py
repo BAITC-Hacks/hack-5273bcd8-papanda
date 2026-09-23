@@ -5,10 +5,10 @@ import json
 import unittest
 from engines.light import LightEngine
 from engines.light.schemas import Analysis
-from engines.light.engine import validate_analysis
+from engines.light.engine import validate_analysis, product_gate
 from engines.common.llm import ScriptedLLM, ProviderError
 from engines.common.channel import AnswerChannel
-from engines.common.contracts import StartRequest, Answer
+from engines.common.contracts import StartRequest, Answer, CardField, Source
 from engines.common.provenance import validate_card
 
 DRAFT="Нужен помощник клиентам. Данных пока нет. Срок месяц."
@@ -124,10 +124,83 @@ class LightTests(unittest.IsolatedAsyncioTestCase):
         rid=await engine.start(StartRequest(task_id="t",draft=DRAFT,field_weights=WEIGHTS));await self.answer(engine,rid)
         state=await wait_status(engine,rid,"card_ready");self.assertEqual(state.metrics["rejections"],1)
 
+    async def test_judge_correction_with_missing_coverage_gets_bounded_repair(self):
+        incomplete=analysis_fixture()
+        incomplete["questions"][2].update(field="users",contradiction_id="C2")
+        judge=ScriptedLLM(['{"accepted":false,"issues":[{"target_id":"Q1","problem":"Уточните вопрос"}]}'])
+        engine=self.make_engine([analysis_fixture(),incomplete,analysis_fixture()],judge=judge)
+        rid=await engine.start(StartRequest(task_id="t",draft=DRAFT,field_weights=WEIGHTS))
+        try:
+            state=await wait_status(engine,rid,"waiting_answers")
+            self.assertEqual({q.contradiction_id for q in state.pending_questions},{"C1","C2","C3"})
+            self.assertEqual(state.metrics["llm_calls"],4)
+            self.assertEqual(state.metrics["rejections"],2)
+            self.assertEqual(len(judge.calls),1)
+            payload=json.loads(engine.actor.calls[2]["messages"][-1]["content"])
+            self.assertIn("Каждое противоречие должно быть покрыто вопросом",payload["correction"])
+            self.assertEqual(payload["previous"],incomplete)
+        finally:
+            await engine.cancel(rid)
+
+    async def test_judge_correction_repeated_bad_structure_stops(self):
+        incomplete=analysis_fixture()
+        incomplete["questions"][2].update(field="users",contradiction_id="C2")
+        judge=ScriptedLLM(['{"accepted":false,"issues":[{"target_id":"Q1","problem":"Уточните вопрос"}]}'])
+        engine=self.make_engine([analysis_fixture(),incomplete,incomplete],judge=judge)
+        rid=await engine.start(StartRequest(task_id="t",draft=DRAFT,field_weights=WEIGHTS))
+        await engine.jobs[rid]
+        state=engine.view(rid)
+        self.assertEqual(state.status,"failed")
+        self.assertEqual(state.stop_reason,"structural_failed")
+        self.assertEqual(state.metrics["llm_calls"],4)
+        self.assertEqual(len(engine.actor.calls),3)
+        self.assertEqual(len(judge.calls),1)
+
     def test_structural_cross_side_refs_and_question_coverage(self):
         proposal=analysis_fixture();proposal["contradictions"][0]["opposite_refs"]=["E1"]
         self.assertTrue(validate_analysis(Analysis.model_validate(proposal),DRAFT))
         proposal=analysis_fixture();proposal["questions"][0]["text"]="Два? Вопроса?"
         self.assertTrue(validate_analysis(Analysis.model_validate(proposal),DRAFT))
+
+    async def test_available_answer_cannot_reintroduce_old_absence_in_constraints(self):
+        draft="Нужен помощник клиентам. Данных пока нет, срок — месяц."
+        answer="CSV с расписанием и 30 обезличенных тестовых вопросов доступны команде сразу. Ранее указанное отсутствие данных больше не актуально."
+        analysis=analysis_fixture()
+        analysis["simplest"]["elements"][1]["quote"]="Данных пока нет"
+        analysis["simplest"]["elements"][2]["quote"]="срок — месяц"
+        bad=card_fixture(answer)
+        bad["card"]["fields"]["data"]["sources"][0]["quote"]=answer
+        bad["card"]["fields"]["constraints"]={"value":"Данных пока нет, срок — месяц.","sources":[{"source_id":"draft","quote":"Данных пока нет, срок — месяц."}]}
+        for corrected in (False,True):
+            with self.subTest(corrected=corrected):
+                repaired=copy.deepcopy(bad)
+                repaired["card"]["fields"]["constraints"]={"value":None,"sources":[]}
+                outputs=[analysis,bad,repaired] if corrected else [analysis,bad,bad,bad]
+                engine=self.make_engine(outputs)
+                rid=await engine.start(StartRequest(task_id="t",draft=draft,field_weights=WEIGHTS))
+                waiting=await wait_status(engine,rid,"waiting_answers")
+                await engine.submit_answers(rid,[Answer(question_id=q.question_id,text=answer if q.field=="data" else "Не знаю") for q in waiting.pending_questions])
+                state=await wait_status(engine,rid,"card_ready")
+                self.assertIsNone(state.card.fields["constraints"].value)
+                self.assertEqual(state.card.fields["constraints"].sources,[])
+                self.assertEqual(state.card.fields["data"].value,answer)
+                errors=[error for event in engine.trace(rid) if event["event"]=="card_validated" for error in event["errors"]]
+                self.assertTrue(any(e["code"]=="obsolete_data_absence" for e in errors))
+
+    def test_obsolete_data_guard_preserves_clean_deadline_and_transfer_prohibition(self):
+        available="CSV с расписанием доступен команде сразу."
+        for text in ("Срок — месяц.","Не передавать персональные данные.","Доступ к внутреннему расписанию для прототипа запрещён."):
+            with self.subTest(text=text):
+                ctx={"sources":{"draft":text,"A1":available},"answer_fields":{"A1":"data"}}
+                field=CardField(value=text,sources=[Source(source_id="draft",quote=text)])
+                self.assertEqual(product_gate("constraints",field,ctx),[])
+
+    def test_unknown_or_still_unavailable_answer_does_not_revoke_old_absence(self):
+        text="Данных пока нет, срок — месяц."
+        field=CardField(value=text,sources=[Source(source_id="draft",quote=text)])
+        for answer in ("Не знаю","CSV пока недоступен, данных пока нет"):
+            with self.subTest(answer=answer):
+                ctx={"sources":{"draft":text,"A1":answer},"answer_fields":{"A1":"data"}}
+                self.assertEqual(product_gate("constraints",field,ctx),[])
 
 if __name__=="__main__": unittest.main()

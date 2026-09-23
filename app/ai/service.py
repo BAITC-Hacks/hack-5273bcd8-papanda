@@ -75,7 +75,7 @@ class TaskRunService:
         current_refs = {s.source_id for name, field in task.card.fields.items()
                         if name != FieldName.contact for s in field.sources}
         sources = {k: v for k, v in task.sources.items()
-                   if (k.startswith("answer:") or k in current_refs) and k not in forbidden
+                   if (k.startswith(("answer:", "prior:")) or (k.startswith("A") and k[1:].isdigit()) or k in current_refs) and k not in forbidden
                    and not contains_contact(v, contact)}
         sources["draft"] = task.text
         for name, field in task.card.fields.items():
@@ -124,9 +124,13 @@ class TaskRunService:
             from engines.common.contracts import StartRequest
             engine = get_engine(state.mode)
             task = self.store.get_task(task_id)
+            # Keep user provenance separate from the new run's A1/A2 answers.
+            prior = {(key if key.startswith(("field:", "prior:")) else f"prior:{task.revision}:{key}"): value
+                     for key, value in ctx["sources"].items() if key != "draft"}
+            ctx["sources"] = {"draft": task.text, **prior}
             engine_id = await engine.start(StartRequest(
                 task_id=task_id, draft=task.text, industry=task.industry,
-                field_weights=FIELD_WEIGHTS,
+                field_weights=FIELD_WEIGHTS, prior_sources=prior,
             ))
             ctx["engine_id"] = engine_id
             ctx["engine"] = engine
@@ -179,7 +183,9 @@ class TaskRunService:
             edges=[GraphEdge(source=e.source, target=e.target, label=e.kind) for e in view.graph.edges],
         )
         state.calls = int(view.metrics.get("llm_calls", 0))
-        state.tokens = {role: sum(value for value in usage.values() if isinstance(value, int))
+        state.tokens = {role: (usage["total_tokens"] if isinstance(usage.get("total_tokens"), int)
+                              else sum(usage.get(key, 0) for key in ("prompt_tokens", "completion_tokens")
+                                       if isinstance(usage.get(key, 0), int)))
                         for role, usage in view.metrics.get("tokens_by_role", {}).items()
                         if isinstance(usage, dict)}
         state.elapsed_seconds = float(view.metrics.get("elapsed_s", 0))
@@ -212,7 +218,7 @@ class TaskRunService:
             card.fields[FieldName.context] = CardField(value=ctx["sources"]["draft"], status="ai_proposed", sources=[Source(source_id="draft", quote=ctx["sources"]["draft"])])
             for field, source_id in ctx["answers"].items():
                 value = ctx["sources"][source_id]
-                if value.strip():
+                if not is_unknown_answer(value):
                     card.fields[FieldName(field)] = CardField(value=value, status="ai_proposed", sources=[Source(source_id=source_id, quote=value)])
             self._commit(task_id, card)
 

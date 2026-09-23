@@ -37,7 +37,27 @@ def measurable(value: str) -> bool:
 
 
 def bounded(value: str) -> bool:
-    return bool(re.search(r"срок|недел|месяц|дней|дня|день|час|доступ|технолог|python|java|react|sql|api|бюджет|руб|тенге|только|нельзя|запрещ|не более|без |огранич|до \d|не позднее", value.casefold()))
+    return bool(re.search(r"срок|недел|месяц|дней|дня|день|час|доступ|технолог|python|java|react|sql|api|бюджет|руб|тенге|только|нельзя|запрещ|не более|не\s+передавать|без |огранич|до \d|не позднее", value.casefold()))
+
+
+def explicitly_unknown(name: FieldName, value: str) -> bool:
+    """Recognize explicit unknown predicates, not any word with a 'не' prefix.
+
+    These local rules are conservative; they do not infer meaning for arbitrary
+    text. Keep the subject field-specific and within the same sentence.
+    """
+    subjects = {
+        FieldName.constraints: r"срок\w*|ограничени\w*|бюджет\w*|дедлайн\w*",
+        FieldName.success_criteria: r"критери\w*|порог\w*|метрик\w*|показател\w*",
+    }
+    subject = subjects.get(name)
+    if subject is None:
+        return False
+    # Short-form predicates distinguish 'критерии неизвестны' from
+    # 'критерии для неизвестных пользователей'.
+    unknown = r"\b(?:не\s*извест(?:ен|на|но|ны)|не\s*определен(?:а|о|ы)?|не\s*установлен(?:а|о|ы)?)\b"
+    return any(re.search(rf"\b(?:{subject})\b", sentence) and re.search(unknown, sentence)
+               for sentence in re.split(r"[.!?;\n]+", value.casefold().replace("ё", "е")))
 
 
 def field_points(name: FieldName, value: str, confirmed: bool) -> tuple[float, str]:
@@ -52,6 +72,8 @@ def field_points(name: FieldName, value: str, confirmed: bool) -> tuple[float, s
         return (maximum, "Указан контакт") if contact_valid(value) else (0, "Укажите e-mail, телефон или @handle")
     if not meaningful(value):
         return 0, "Опишите конкретнее: минимум 20 символов"
+    if explicitly_unknown(name, value):
+        return 0, "Уточните неизвестные сроки, ограничения или критерии; сообщение об их отсутствии не даёт баллов"
     if name == FieldName.data and not data_available(value):
         return 0, "Назовите уже доступный источник, формат или пример; недоступные, будущие или неоднозначно доступные материалы не дают баллов"
     if name == FieldName.constraints and not bounded(value):

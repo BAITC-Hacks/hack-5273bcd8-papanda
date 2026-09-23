@@ -9,6 +9,17 @@ from app.ai.service import TaskRunService
 from app.ai.validation import validate_field
 from app.contracts import Task, CardField, Source, Answer
 
+def test_provider_usage_total_is_not_counted_twice():
+    from app.contracts import RunState
+    from engines.common.contracts import RunView
+    state = RunState(task_id="t")
+    view = RunView(run_id="r", task_id="t", engine="light", status="analyzing", metrics={
+        "tokens_by_role": {"actor": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120},
+                          "judge": {"prompt_tokens": 40, "completion_tokens": 10}},
+    })
+    TaskRunService._copy_external_view(state, view)
+    assert state.tokens == {"actor": 120, "judge": 50}
+
 class Store:
     def __init__(self):
         self.task = Task(id="t", text="Нужен отчёт по продажам", industry="retail", created_at="now")
@@ -74,6 +85,22 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.task.status,"draft")
         self.assertEqual(self.store.task.card.fields[FieldName.contact].value,"private@example.test")
         self.assertEqual(self.store.task.card.fields[FieldName.title].value,"Мой заголовок")
+
+    async def test_stub_unknown_answers_leave_card_fields_empty(self):
+        self.service.start("t", "stub"); await self.advance()
+        unknowns = ["Не знаю", "пока не знаю!", "Неизвестно", "", "Нет ответа"]
+        answered_fields = set()
+        while self.service.get("t").status == "waiting_answers":
+            questions = self.service.get("t").pending_questions
+            answered_fields.update(q.field for q in questions)
+            await self.service.submit_answers("t", [
+                Answer(answer_id=q.answer_id, answer=unknowns[i % len(unknowns)])
+                for i, q in enumerate(questions)])
+            await self.advance()
+        self.assertEqual(self.service.get("t").status, "card_ready")
+        for name in answered_fields:
+            self.assertFalse(self.store.task.card.fields[name].value)
+            self.assertFalse(self.store.task.card.fields[name].sources)
 
     async def test_human_wait_expires_without_polling(self):
         with patch.dict(os.environ,{"AI_RUN_TIMEOUT":"0.02"}):

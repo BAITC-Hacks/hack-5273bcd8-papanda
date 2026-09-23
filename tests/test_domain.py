@@ -77,6 +77,34 @@ def test_available_materials_score(value):
     assert field_points(FieldName.data, value, True)[0] == 20
 
 
+@pytest.mark.parametrize("name,value", [
+    (FieldName.constraints, "Данные, срок и критерии пока не определены."),
+    (FieldName.success_criteria, "Данные, срок и критерии пока не определены."),
+    (FieldName.success_criteria, "Критерии успеха неизвестны."),
+    (FieldName.success_criteria, "Критерии приемки пока не установлены."),
+    (FieldName.success_criteria, "Пока неизвестны критерии успешности решения."),
+    (FieldName.constraints, "Срок выполнения пока не определён."),
+    (FieldName.constraints, "Ограничения проекта пока неизвестны."),
+    (FieldName.constraints, "Бюджет на разработку не установлен."),
+])
+def test_explicitly_unknown_limits_and_criteria_do_not_score(name, value):
+    assert field_points(name, value, True)[0] == 0
+
+
+@pytest.mark.parametrize("name,value,points", [
+    (FieldName.success_criteria, "Время ответа не более 5 секунд", 15),
+    (FieldName.constraints, "Нельзя передавать персональные данные третьим лицам", 10),
+    (FieldName.constraints, "Не передавать персональные данные через внешний API", 10),
+    (FieldName.constraints, "Не передавать персональные данные", 10),
+    (FieldName.data, "Доступен CSV с данными неизвестных пользователей", 20),
+    (FieldName.success_criteria, "Обработать 30 запросов от неизвестных пользователей", 15),
+    (FieldName.constraints, "Критерии неизвестны. Срок разработки — 4 недели.", 10),
+    (FieldName.success_criteria, "Срок неизвестен. Критерии: 80% верных ответов.", 15),
+])
+def test_unknown_detection_preserves_real_bounds_and_other_fields(name, value, points):
+    assert field_points(name, value, True)[0] == points
+
+
 @pytest.mark.parametrize("names,level,total", [([], "draft", 0), (["data", "context", "need"], "working", 40), (["data", "context", "need", "expected_result", "success_criteria"], "ready", 70), (["data", "context", "need", "expected_result", "success_criteria", "users", "constraints"], "priority", 90)])
 def test_level_boundaries(names, level, total):
     card = full_card("edited")

@@ -38,3 +38,6 @@
 .crit-text span{display:block;font-weight:600;color:#25332e}
 .crit-text small{display:block;font-size:10px;line-height:1.4;margin-top:2px}
 @media (max-width:700px){.analysis-sides{grid-template-columns:1fr}}
+.task-tile.priority-task{border:2px solid #b28b38;background:linear-gradient(135deg,#fffdf5,#fff);box-shadow:0 4px 14px #a7812920}.task-tile.priority-task:hover{border-color:#8c691e}.priority-badge{color:#785914;background:#fff2cb;border:1px solid #e5cd84;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:800;white-space:nowrap}.priority-task .tile-top{flex-wrap:wrap}.analysis-actions label{min-width:210px}
+
+.engine-explanation{margin-top:14px;color:#657360;font-size:12px}.engine-explanation>.text-button{font-size:12px;text-decoration:underline;padding:0 0 0 4px}.engine-dialog{width:min(520px,calc(100vw - 40px));box-sizing:border-box;border:1px solid #d9e6dc;border-radius:14px;padding:26px;color:#25332e;box-shadow:0 20px 70px #14271f33}.engine-dialog::backdrop{background:#14271f66}.engine-dialog h3{margin:0 0 14px;font-size:20px}.engine-dialog p{font-size:14px;line-height:1.65;margin:0 0 16px}.engine-dialog>.primary{margin-top:6px}

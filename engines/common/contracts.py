@@ -16,6 +16,14 @@ class StartRequest(BaseModel):
     industry: str | None = None
     field_weights: dict[FieldName, int]
     language: Literal["ru"] = "ru"
+    prior_sources: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("prior_sources")
+    @classmethod
+    def namespaced_user_sources(cls, value):
+        if any(not (key.startswith("prior:") or key.startswith("field:")) or key == "field:contact" for key in value):
+            raise ValueError("Prior sources require prior:/field: namespace; contact is manual-only")
+        return value
 
 
 class Question(BaseModel):

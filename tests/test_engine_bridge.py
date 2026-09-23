@@ -9,6 +9,7 @@ import pytest
 from app.ai.service import TaskRunService
 from app.api import create_app
 from app.contracts import Answer as ProductAnswer, Task
+from app.contracts import CardField, FieldName, Source
 from engines.common.llm import ScriptedLLM
 from engines.light import LightEngine
 from test_light_engine import DRAFT, analysis_fixture, card_fixture
@@ -83,10 +84,17 @@ async def test_light_engine_through_product_http_api(tmp_path):
                     break
                 await asyncio.sleep(0.001)
             assert run["status"] == "waiting_answers"
-            submitted = await client.post(f"/api/tasks/{task_id}/answers", json={"answers": [
+            answer_payload = {"answers": [
                 {"answer_id": q["answer_id"], "answer": "Доступен CSV" if q["field"] == "data" else "Не знаю"}
-                for q in run["pending_questions"]]})
+                for q in run["pending_questions"]]}
+            submitted = await client.post(f"/api/tasks/{task_id}/answers", json=answer_payload)
             assert submitted.status_code == 202
+            # The UI polls only active states; accepting answers must leave waiting
+            # before the background engine task gets another event-loop turn.
+            assert submitted.json()["status"] == "building_card"
+            assert submitted.json()["pending_questions"] == []
+            duplicate = await client.post(f"/api/tasks/{task_id}/answers", json=answer_payload)
+            assert duplicate.status_code == 409
             for _ in range(1000):
                 run = (await client.get(f"/api/tasks/{task_id}/run")).json()
                 if run["status"] == "card_ready":
@@ -100,3 +108,55 @@ async def test_light_engine_through_product_http_api(tmp_path):
             assert all(f["value"] != "Не знаю" for f in persisted["card"]["fields"].values())
         await app.state.service.close()
         app.state.store.close()
+
+
+@pytest.mark.asyncio
+async def test_reanalysis_uses_current_manual_fields_and_prior_user_answers_without_contact(tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_TRACE_DIR", str(tmp_path / "traces"))
+    store = MemoryStore()
+    manual = "Срок прототипа изменён: две недели на Python."
+    previous_answer = "Нужен веб-прототип для ответов на вопросы клиентов."
+    store.task.sources = {"draft": DRAFT, "A1": previous_answer,
+                          "prior:earlier:A1": "Ранее проведено интервью с администратором.",
+                          "edit_current": manual, "edit_contact": "owner@example.test",
+                          "edit_old_contact": "old@example.test"}
+    store.task.card.fields[FieldName.constraints] = CardField(
+        value=manual, status="confirmed", sources=[Source(source_id="edit_current", quote=manual)])
+    store.task.card.fields[FieldName.contact] = CardField(
+        value="owner@example.test", status="confirmed",
+        sources=[Source(source_id="edit_contact", quote="owner@example.test")])
+    store.task.card.fields[FieldName.users] = CardField(value="Неподтверждённая интерпретация модели", status="ai_proposed")
+    analysis = analysis_fixture()
+    analysis["simplest"]["elements"][2]["quote"] = manual
+    result = card_fixture()
+    result["card"]["fields"]["expected_result"] = {
+        "value": previous_answer, "sources": [{"source_id": "prior:0:A1", "quote": previous_answer}]}
+    actor = ScriptedLLM([json.dumps(analysis, ensure_ascii=False), json.dumps(result, ensure_ascii=False)])
+    engine = LightEngine(actor=actor, judge=ScriptedLLM(['{"accepted":true,"issues":[]}']), max_rounds=1)
+    service = TaskRunService(store)
+    with patch("engines.get_engine", return_value=engine):
+        try:
+            service.start("t", "light")
+            waiting = await wait_for(service, "waiting_answers")
+            payload = json.loads(actor.calls[0]["messages"][-1]["content"])
+            assert payload["draft"] == DRAFT
+            assert payload["sources"]["field:constraints"] == manual
+            assert payload["sources"]["prior:0:A1"] == previous_answer
+            assert payload["sources"]["prior:earlier:A1"] == "Ранее проведено интервью с администратором."
+            assert not any(key.startswith("prior:0:prior:") for key in payload["sources"])
+            assert "A1" not in payload["sources"]
+            assert "field:contact" not in payload["sources"]
+            serialized = json.dumps(actor.calls, ensure_ascii=False)
+            assert "owner@example.test" not in serialized and "old@example.test" not in serialized
+            assert "Неподтверждённая интерпретация модели" not in serialized
+            await service.submit_answers("t", [ProductAnswer(answer_id=q.answer_id,
+                answer="Доступен CSV" if q.field.value == "data" else "Не знаю") for q in waiting.pending_questions])
+            ready = await wait_for(service, "card_ready")
+            assert ready.card_draft.fields["expected_result"].value == previous_answer
+            assert ready.card_draft.fields["constraints"].value == manual
+            sources = service.contexts["t"]["sources"]
+            assert sources["prior:0:A1"] == previous_answer
+            assert sources["A1"] == "Доступен CSV"
+            assert ready.card_draft.fields["expected_result"].sources[0].source_id == "prior:0:A1"
+        finally:
+            await service.close()

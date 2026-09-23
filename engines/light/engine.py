@@ -36,7 +36,7 @@ def parse(text, schema):
     return schema.model_validate_json(text)
 
 
-def validate_analysis(proposal, draft):
+def validate_analysis(proposal, draft, prior_sources=None):
     errors=[]
     left={e.id for e in proposal.simplest.elements};right={e.id for e in proposal.opposite.elements}
     all_ids=[e.id for e in proposal.simplest.elements+proposal.opposite.elements]+[c.id for c in proposal.contradictions]+[q.id for q in proposal.questions]
@@ -45,8 +45,8 @@ def validate_analysis(proposal, draft):
     if len(left)<3 or len(right)<3: errors.append("Нужно минимум 3 элемента у каждой стороны")
     for element in proposal.simplest.elements:
         quote=normalized(element.quote).rstrip(".!?,;: ")
-        if not quote or quote not in normalized(draft):
-            errors.append(f"{element.id}: quote отсутствует в черновике")
+        if not quote or not any(quote in normalized(text) for text in [draft, *(prior_sources or {}).values()]):
+            errors.append(f"{element.id}: quote отсутствует в пользовательских источниках")
     if len(proposal.contradictions)<3: errors.append("Нужно минимум 3 противоречия/пробела")
     for c in proposal.contradictions:
         # A gap is information absent from the draft, so it may have no business element.
@@ -78,6 +78,21 @@ def product_gate(name, field, ctx):
     latest={f:aid for aid,f in ctx["answer_fields"].items() if not is_unknown_answer(ctx["sources"][aid])}
     if name in latest and latest[name] not in {s.source_id for s in field.sources}:
         return [{"field":name,"code":"current_answer","message":f"Поле должно опираться на последний ответ {latest[name]}"}]
+    if name!="data" and "data" in latest:
+        from app.scoring import data_available
+        answer=ctx["sources"][latest["data"]]
+        # A business may explicitly revoke its old 'no materials' statement.
+        # Exclude only that revocation sentence from the availability check;
+        # the original answer and its provenance stay intact.
+        availability_text=" ".join(sentence for sentence in re.split(r"(?<=[.!?])\s+",answer)
+            if not re.search(r"(?:ранее|прежн\w*)[^.!?]*отсутств\w*[^.!?]*(?:больше\s+не\s+актуальн\w*|отменен\w*)",normalized(sentence)))
+        old_absence=(r"\b(?:данных|материалов|источников)\s+(?:пока\s+)?нет\b"
+            r"|\bнет\s+(?:данных|материалов|источников)\b"
+            r"|\b(?:данные|материалы|источники)\s+(?:пока\s+)?(?:отсутствуют|недоступны|не\s+доступны)\b"
+            r"|\b(?:отсутствуют|недоступны|не\s+доступны)\s+(?:данные|материалы|источники)\b"
+            r"|\bнет\s+доступа\s+к\s+(?:данным|материалам|источникам)\b")
+        if data_available(availability_text) and any(s.source_id=="draft" and re.search(old_absence,normalized(s.quote)) for s in field.sources):
+            return [{"field":name,"code":"obsolete_data_absence","message":"Последний ответ сообщает о доступных материалах. Не переносите старое отсутствие данных в другое поле. Используйте отдельное полное актуальное предложение или null; смешанную цитату со сроком не обрезайте."}]
     return []
 
 
@@ -125,7 +140,7 @@ class LightEngine:
         run_id=uuid4().hex
         self.runs[run_id]=RunView(run_id=run_id,task_id=req.task_id,engine="light",status="analyzing",
             metrics={"llm_calls":0,"tokens_by_role":{},"elapsed_s":0,"rejections":0,"rounds":0,"judge_unavailable":0})
-        self.contexts[run_id]={"request":req,"sources":{"draft":req.draft},"answer_fields":{},"observations":[],"active_s":0.0,"started":time.monotonic()}
+        self.contexts[run_id]={"request":req,"sources":{"draft":req.draft, **req.prior_sources},"answer_fields":{},"observations":[],"active_s":0.0,"started":time.monotonic()}
         self.traces[run_id]=Trace(run_id)
         self._event(run_id,"run_started")
         self.jobs[run_id]=asyncio.create_task(self._run(run_id))
@@ -144,6 +159,10 @@ class LightEngine:
         if len(ids)!=len(set(ids)) or set(ids)!={q.question_id for q in state.pending_questions}:
             raise ValueError("Нужен один ответ на каждый текущий вопрос; пустой ответ допустим")
         self.channel.submit(run_id,answers)
+        # Acceptance resumes processing immediately, before the worker wakes up.
+        # This also prevents submitting the same answer batch twice.
+        state.status="building_card"
+        state.pending_questions=[]
 
     async def cancel(self, run_id):
         self.channel.cancel(run_id)
@@ -187,7 +206,8 @@ class LightEngine:
         for attempt in range(2):
             try:
                 proposal=await self._call(run_id,"actor",prompt,payload,Analysis)
-                errors=validate_analysis(proposal,self.contexts[run_id]["request"].draft)
+                request=self.contexts[run_id]["request"]
+                errors=validate_analysis(proposal,request.draft,request.prior_sources)
                 if errors: raise Rejected("structural_failed",errors)
                 self._event(run_id,"proposal",stage="ANALYZE",proposal=proposal.model_dump())
                 return proposal
@@ -202,6 +222,8 @@ class LightEngine:
         state=self.runs[run_id]
         state.graph.nodes=[GraphNode(id="P1",kind="simplest",label=proposal.simplest.content),GraphNode(id="P2",kind="opposite",label=OPPOSITE+": "+OPPOSITE_NEED)]
         state.graph.edges=[]
+        for source_id, text in self.contexts[run_id]["request"].prior_sources.items():
+            state.graph.nodes.append(GraphNode(id=source_id,kind="answer",label=text))
         for side,elements,parent in [("simplest",proposal.simplest.elements,"P1"),("opposite",proposal.opposite.elements,"P2")]:
             for e in elements:
                 label=f"«{e.quote.strip()}»" if side=="simplest" else e.statement
@@ -221,8 +243,8 @@ class LightEngine:
         state.status="waiting_answers";state.metrics["rounds"]+=1
         if "time_to_questions_s" not in state.metrics: state.metrics["time_to_questions_s"]=ctx["active_s"]
         self._event(run_id,"questions_asked",questions=[q.model_dump() for q in state.pending_questions])
-        answers=await self.channel.ask(run_id,state.pending_questions)
         qmap={q.question_id:q for q in state.pending_questions}
+        answers=await self.channel.ask(run_id,state.pending_questions)
         received=[]
         for answer in answers:
             aid=f"A{len(ctx['answer_fields'])+1}"
@@ -326,10 +348,11 @@ class LightEngine:
     async def _run(self,run_id):
         state=self.runs[run_id];ctx=self.contexts[run_id]
         try:
-            proposal=await self._proposal(run_id,{"draft":ctx["request"].draft,"opposite":OPPOSITE,"opposite_need":OPPOSITE_NEED})
+            analysis_input={"draft":ctx["request"].draft,"sources":ctx["sources"],"opposite":OPPOSITE,"opposite_need":OPPOSITE_NEED}
+            proposal=await self._proposal(run_id,analysis_input)
             if self.judge_enabled:
                 try:
-                    critique=await self._call(run_id,"judge",(PROMPTS/"critique.md").read_text(encoding="utf-8"),{"draft":ctx["request"].draft,"analysis":proposal.model_dump()},Critique)
+                    critique=await self._call(run_id,"judge",(PROMPTS/"critique.md").read_text(encoding="utf-8"),{**analysis_input,"analysis":proposal.model_dump()},Critique)
                 except Exception as exc:
                     if isinstance(exc,Rejected) and exc.reason in {"budget","deadline"}: raise
                     state.metrics["judge_unavailable"]+=1
@@ -338,9 +361,7 @@ class LightEngine:
                     if not critique.accepted:
                         state.metrics["rejections"]+=1
                         self._event(run_id,"rejected",stage="CRITIQUE",reason="semantic",issues=[i.model_dump() for i in critique.issues])
-                        proposal=await self._call(run_id,"actor",(PROMPTS/"analyze.md").read_text(encoding="utf-8"),{"draft":ctx["request"].draft,"previous":proposal.model_dump(),"correction":[i.model_dump() for i in critique.issues]},Analysis)
-                        errors=validate_analysis(proposal,ctx["request"].draft)
-                        if errors: raise Rejected("structural_failed",errors)
+                        proposal=await self._proposal(run_id,{**analysis_input,"previous":proposal.model_dump(),"correction":[i.model_dump() for i in critique.issues]})
             self._graph(run_id,proposal)
             questions=proposal.questions
             for round_index in range(self.max_rounds):
