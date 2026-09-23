@@ -1,0 +1,1531 @@
+{
+  "tasks": [
+    {
+      "id": "draft-1",
+      "text": "Хотим чат-бота на ИИ для клиентов, данных пока нет, нужно к следующему месяцу.",
+      "industry": "Образование",
+      "status": "draft",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "context": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "need": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "users": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "data": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "constraints": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "expected_result": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "success_criteria": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "contact": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "interaction_format": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          }
+        }
+      },
+      "score": {
+        "total": 0.0,
+        "level": "draft",
+        "breakdown": [],
+        "missing": []
+      },
+      "created_at": "2026-09-23T08:01:00+00:00",
+      "published_at": null,
+      "sources": {
+        "draft": "Хотим чат-бота на ИИ для клиентов, данных пока нет, нужно к следующему месяцу."
+      },
+      "revision": 0
+    },
+    {
+      "id": "task-1",
+      "text": "Хотим чат-бота на ИИ для клиентов, данных пока нет, нужно к следующему месяцу.",
+      "industry": "Образование",
+      "status": "published",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "Помощник учебного центра",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-title",
+                "quote": "Помощник учебного центра"
+              }
+            ]
+          },
+          "context": {
+            "value": "Администраторы учебного центра вручную отвечают на повторяющиеся вопросы о курсах.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-context",
+                "quote": "Администраторы учебного центра вручную отвечают на повторяющиеся вопросы о курсах."
+              }
+            ]
+          },
+          "need": {
+            "value": "Сократить повторяющиеся ответы администратора и дать клиентам доступ к расписанию.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-need",
+                "quote": "Сократить повторяющиеся ответы администратора и дать клиентам доступ к расписанию."
+              }
+            ]
+          },
+          "users": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "data": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "constraints": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "expected_result": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "success_criteria": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "contact": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "interaction_format": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          }
+        }
+      },
+      "score": {
+        "total": 20.0,
+        "level": "draft",
+        "breakdown": [
+          {
+            "criterion": "Название",
+            "field": "title",
+            "points": 0.0,
+            "max": 0.0,
+            "reason": "Название не влияет на рейтинг"
+          },
+          {
+            "criterion": "Контекст",
+            "field": "context",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Потребность",
+            "field": "need",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Пользователи",
+            "field": "users",
+            "points": 0.0,
+            "max": 10.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Данные и материалы",
+            "field": "data",
+            "points": 0.0,
+            "max": 20.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Ограничения",
+            "field": "constraints",
+            "points": 0.0,
+            "max": 10.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Ожидаемый результат",
+            "field": "expected_result",
+            "points": 0.0,
+            "max": 15.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Критерии успеха",
+            "field": "success_criteria",
+            "points": 0.0,
+            "max": 15.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Контакт",
+            "field": "contact",
+            "points": 0.0,
+            "max": 5.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Формат взаимодействия",
+            "field": "interaction_format",
+            "points": 0.0,
+            "max": 5.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          }
+        ],
+        "missing": [
+          {
+            "field": "data",
+            "max_gain": 20.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "expected_result",
+            "max_gain": 15.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "success_criteria",
+            "max_gain": 15.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "users",
+            "max_gain": 10.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "constraints",
+            "max_gain": 10.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "contact",
+            "max_gain": 5.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "interaction_format",
+            "max_gain": 5.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          }
+        ]
+      },
+      "created_at": "2026-09-23T08:01:00+00:00",
+      "published_at": "2026-09-23T08:01:00+00:00",
+      "sources": {
+        "draft": "Хотим чат-бота на ИИ для клиентов, данных пока нет, нужно к следующему месяцу.",
+        "seed-title": "Помощник учебного центра",
+        "seed-context": "Администраторы учебного центра вручную отвечают на повторяющиеся вопросы о курсах.",
+        "seed-need": "Сократить повторяющиеся ответы администратора и дать клиентам доступ к расписанию.",
+        "seed-users": "Будущие слушатели курсов и администраторы учебного центра.",
+        "seed-data": "Данных пока нет; CSV с расписанием и 30 обезличенных вопросов подготовит бизнес.",
+        "seed-constraints": "Срок прототипа — 4 недели; использовать Python и только публичные учебные данные.",
+        "seed-expected_result": "Веб-прототип помощника по расписанию с передачей неизвестного вопроса администратору.",
+        "seed-success_criteria": "Не менее 80% из 30 тестовых вопросов получают ответ со ссылкой на расписание.",
+        "seed-contact": "courses@example.test",
+        "seed-interaction_format": "Консультация с представителем бизнеса раз в неделю, обратная связь в течение двух дней."
+      },
+      "revision": 0
+    },
+    {
+      "id": "draft-2",
+      "text": "Магазин хочет уменьшить списания. Есть CSV продаж за год. Нужен отчёт за три недели.",
+      "industry": "Торговля",
+      "status": "draft",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "context": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "need": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "users": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "data": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "constraints": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "expected_result": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "success_criteria": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "contact": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "interaction_format": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          }
+        }
+      },
+      "score": {
+        "total": 0.0,
+        "level": "draft",
+        "breakdown": [],
+        "missing": []
+      },
+      "created_at": "2026-09-23T08:02:00+00:00",
+      "published_at": null,
+      "sources": {
+        "draft": "Магазин хочет уменьшить списания. Есть CSV продаж за год. Нужен отчёт за три недели."
+      },
+      "revision": 0
+    },
+    {
+      "id": "task-2",
+      "text": "Магазин хочет уменьшить списания. Есть CSV продаж за год. Нужен отчёт за три недели.",
+      "industry": "Торговля",
+      "status": "published",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "Прогноз остатков магазина",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-title",
+                "quote": "Прогноз остатков магазина"
+              }
+            ]
+          },
+          "context": {
+            "value": "В небольшом магазине часть скоропортящихся товаров списывается из-за избыточных заказов.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-context",
+                "quote": "В небольшом магазине часть скоропортящихся товаров списывается из-за избыточных заказов."
+              }
+            ]
+          },
+          "need": {
+            "value": "Помочь закупщику оценивать потребность в товарах на следующую неделю.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-need",
+                "quote": "Помочь закупщику оценивать потребность в товарах на следующую неделю."
+              }
+            ]
+          },
+          "users": {
+            "value": "Закупщик магазина и управляющий торговой точкой.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-users",
+                "quote": "Закупщик магазина и управляющий торговой точкой."
+              }
+            ]
+          },
+          "data": {
+            "value": "Есть обезличенный CSV продаж за 12 месяцев: дата, товар, количество и остаток.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-data",
+                "quote": "Есть обезличенный CSV продаж за 12 месяцев: дата, товар, количество и остаток."
+              }
+            ]
+          },
+          "constraints": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "expected_result": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "success_criteria": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "contact": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "interaction_format": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          }
+        }
+      },
+      "score": {
+        "total": 50.0,
+        "level": "working",
+        "breakdown": [
+          {
+            "criterion": "Название",
+            "field": "title",
+            "points": 0.0,
+            "max": 0.0,
+            "reason": "Название не влияет на рейтинг"
+          },
+          {
+            "criterion": "Контекст",
+            "field": "context",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Потребность",
+            "field": "need",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Пользователи",
+            "field": "users",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Данные и материалы",
+            "field": "data",
+            "points": 20.0,
+            "max": 20.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Ограничения",
+            "field": "constraints",
+            "points": 0.0,
+            "max": 10.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Ожидаемый результат",
+            "field": "expected_result",
+            "points": 0.0,
+            "max": 15.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Критерии успеха",
+            "field": "success_criteria",
+            "points": 0.0,
+            "max": 15.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Контакт",
+            "field": "contact",
+            "points": 0.0,
+            "max": 5.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Формат взаимодействия",
+            "field": "interaction_format",
+            "points": 0.0,
+            "max": 5.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          }
+        ],
+        "missing": [
+          {
+            "field": "expected_result",
+            "max_gain": 15.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "success_criteria",
+            "max_gain": 15.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "constraints",
+            "max_gain": 10.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "contact",
+            "max_gain": 5.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "interaction_format",
+            "max_gain": 5.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          }
+        ]
+      },
+      "created_at": "2026-09-23T08:02:00+00:00",
+      "published_at": "2026-09-23T08:02:00+00:00",
+      "sources": {
+        "draft": "Магазин хочет уменьшить списания. Есть CSV продаж за год. Нужен отчёт за три недели.",
+        "seed-title": "Прогноз остатков магазина",
+        "seed-context": "В небольшом магазине часть скоропортящихся товаров списывается из-за избыточных заказов.",
+        "seed-need": "Помочь закупщику оценивать потребность в товарах на следующую неделю.",
+        "seed-users": "Закупщик магазина и управляющий торговой точкой.",
+        "seed-data": "Есть обезличенный CSV продаж за 12 месяцев: дата, товар, количество и остаток.",
+        "seed-constraints": "Срок 3 недели; Python; данные доступны только в предоставленном учебном CSV.",
+        "seed-expected_result": "Отчёт с недельным прогнозом и сравнением с простым средним по предыдущим неделям.",
+        "seed-success_criteria": "Ошибка прогноза не более 20% на отложенных последних четырёх неделях.",
+        "seed-contact": "shop@example.test",
+        "seed-interaction_format": "Закупщик проверяет промежуточный отчёт каждую пятницу и отвечает в течение суток."
+      },
+      "revision": 0
+    },
+    {
+      "id": "draft-3",
+      "text": "Хотим карту пунктов переработки для жителей. Есть открытый список адресов.",
+      "industry": "Экология",
+      "status": "draft",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "context": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "need": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "users": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "data": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "constraints": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "expected_result": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "success_criteria": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "contact": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "interaction_format": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          }
+        }
+      },
+      "score": {
+        "total": 0.0,
+        "level": "draft",
+        "breakdown": [],
+        "missing": []
+      },
+      "created_at": "2026-09-23T08:03:00+00:00",
+      "published_at": null,
+      "sources": {
+        "draft": "Хотим карту пунктов переработки для жителей. Есть открытый список адресов."
+      },
+      "revision": 0
+    },
+    {
+      "id": "task-3",
+      "text": "Хотим карту пунктов переработки для жителей. Есть открытый список адресов.",
+      "industry": "Экология",
+      "status": "published",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "Карта точек переработки",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-title",
+                "quote": "Карта точек переработки"
+              }
+            ]
+          },
+          "context": {
+            "value": "Жителям района трудно найти действующие пункты приёма разных видов вторсырья.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-context",
+                "quote": "Жителям района трудно найти действующие пункты приёма разных видов вторсырья."
+              }
+            ]
+          },
+          "need": {
+            "value": "Собрать доступные пункты приёма на одной карте с фильтрами по типу материала.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-need",
+                "quote": "Собрать доступные пункты приёма на одной карте с фильтрами по типу материала."
+              }
+            ]
+          },
+          "users": {
+            "value": "Жители района, которые самостоятельно сортируют бытовые отходы.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-users",
+                "quote": "Жители района, которые самостоятельно сортируют бытовые отходы."
+              }
+            ]
+          },
+          "data": {
+            "value": "Открытая таблица CSV с адресами пунктов, координатами и типами принимаемого сырья.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-data",
+                "quote": "Открытая таблица CSV с адресами пунктов, координатами и типами принимаемого сырья."
+              }
+            ]
+          },
+          "constraints": {
+            "value": "Срок 2 недели; использовать только открытые данные и бесплатную картографическую библиотеку.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-constraints",
+                "quote": "Срок 2 недели; использовать только открытые данные и бесплатную картографическую библиотеку."
+              }
+            ]
+          },
+          "expected_result": {
+            "value": "Интерактивная карта с фильтром по материалу и ссылкой на исходный список адресов.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-expected_result",
+                "quote": "Интерактивная карта с фильтром по материалу и ссылкой на исходный список адресов."
+              }
+            ]
+          },
+          "success_criteria": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "contact": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "interaction_format": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          }
+        }
+      },
+      "score": {
+        "total": 75.0,
+        "level": "ready",
+        "breakdown": [
+          {
+            "criterion": "Название",
+            "field": "title",
+            "points": 0.0,
+            "max": 0.0,
+            "reason": "Название не влияет на рейтинг"
+          },
+          {
+            "criterion": "Контекст",
+            "field": "context",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Потребность",
+            "field": "need",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Пользователи",
+            "field": "users",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Данные и материалы",
+            "field": "data",
+            "points": 20.0,
+            "max": 20.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Ограничения",
+            "field": "constraints",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Ожидаемый результат",
+            "field": "expected_result",
+            "points": 15.0,
+            "max": 15.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Критерии успеха",
+            "field": "success_criteria",
+            "points": 0.0,
+            "max": 15.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Контакт",
+            "field": "contact",
+            "points": 0.0,
+            "max": 5.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "criterion": "Формат взаимодействия",
+            "field": "interaction_format",
+            "points": 0.0,
+            "max": 5.0,
+            "reason": "Добавьте сведения и подтвердите поле"
+          }
+        ],
+        "missing": [
+          {
+            "field": "success_criteria",
+            "max_gain": 15.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "contact",
+            "max_gain": 5.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          },
+          {
+            "field": "interaction_format",
+            "max_gain": 5.0,
+            "hint": "Добавьте сведения и подтвердите поле"
+          }
+        ]
+      },
+      "created_at": "2026-09-23T08:03:00+00:00",
+      "published_at": "2026-09-23T08:03:00+00:00",
+      "sources": {
+        "draft": "Хотим карту пунктов переработки для жителей. Есть открытый список адресов.",
+        "seed-title": "Карта точек переработки",
+        "seed-context": "Жителям района трудно найти действующие пункты приёма разных видов вторсырья.",
+        "seed-need": "Собрать доступные пункты приёма на одной карте с фильтрами по типу материала.",
+        "seed-users": "Жители района, которые самостоятельно сортируют бытовые отходы.",
+        "seed-data": "Открытая таблица CSV с адресами пунктов, координатами и типами принимаемого сырья.",
+        "seed-constraints": "Срок 2 недели; использовать только открытые данные и бесплатную картографическую библиотеку.",
+        "seed-expected_result": "Интерактивная карта с фильтром по материалу и ссылкой на исходный список адресов.",
+        "seed-success_criteria": "Все 25 пунктов из таблицы видны на карте, фильтры проходят 5 подготовленных сценариев.",
+        "seed-contact": "recycle@example.test",
+        "seed-interaction_format": "Куратор проверяет адреса перед демонстрацией и отвечает на вопросы дважды в неделю."
+      },
+      "revision": 0
+    },
+    {
+      "id": "draft-4",
+      "text": "Доставка идёт долго. Хотим понятный план маршрутов, есть XLSX заказов и ограничения водителя.",
+      "industry": "Логистика",
+      "status": "draft",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "context": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "need": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "users": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "data": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "constraints": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "expected_result": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "success_criteria": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "contact": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "interaction_format": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          }
+        }
+      },
+      "score": {
+        "total": 0.0,
+        "level": "draft",
+        "breakdown": [],
+        "missing": []
+      },
+      "created_at": "2026-09-23T08:04:00+00:00",
+      "published_at": null,
+      "sources": {
+        "draft": "Доставка идёт долго. Хотим понятный план маршрутов, есть XLSX заказов и ограничения водителя."
+      },
+      "revision": 0
+    },
+    {
+      "id": "task-4",
+      "text": "Доставка идёт долго. Хотим понятный план маршрутов, есть XLSX заказов и ограничения водителя.",
+      "industry": "Логистика",
+      "status": "published",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "Планировщик доставки",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-title",
+                "quote": "Планировщик доставки"
+              }
+            ]
+          },
+          "context": {
+            "value": "Диспетчер небольшой службы доставки вручную распределяет адреса между двумя маршрутами.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-context",
+                "quote": "Диспетчер небольшой службы доставки вручную распределяет адреса между двумя маршрутами."
+              }
+            ]
+          },
+          "need": {
+            "value": "Помочь диспетчеру составлять маршруты с учётом времени доставки и вместимости.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-need",
+                "quote": "Помочь диспетчеру составлять маршруты с учётом времени доставки и вместимости."
+              }
+            ]
+          },
+          "users": {
+            "value": "Диспетчер службы доставки и руководитель смены.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-users",
+                "quote": "Диспетчер службы доставки и руководитель смены."
+              }
+            ]
+          },
+          "data": {
+            "value": "Синтетический XLSX с 40 заказами: координаты, объём и допустимый интервал доставки.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-data",
+                "quote": "Синтетический XLSX с 40 заказами: координаты, объём и допустимый интервал доставки."
+              }
+            ]
+          },
+          "constraints": {
+            "value": "Срок 4 недели; не более двух машин, каждая вместимостью 20 условных единиц.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-constraints",
+                "quote": "Срок 4 недели; не более двух машин, каждая вместимостью 20 условных единиц."
+              }
+            ]
+          },
+          "expected_result": {
+            "value": "Редактируемый план двух маршрутов с видимыми нарушениями заданных ограничений.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-expected_result",
+                "quote": "Редактируемый план двух маршрутов с видимыми нарушениями заданных ограничений."
+              }
+            ]
+          },
+          "success_criteria": {
+            "value": "На тестовом наборе 40 заказов нет превышения вместимости и все интервалы проверены.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-success_criteria",
+                "quote": "На тестовом наборе 40 заказов нет превышения вместимости и все интервалы проверены."
+              }
+            ]
+          },
+          "contact": {
+            "value": "routes@example.test",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-contact",
+                "quote": "routes@example.test"
+              }
+            ]
+          },
+          "interaction_format": {
+            "value": "Диспетчер показывает текущий процесс на встрече и проверяет результат раз в неделю.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-interaction_format",
+                "quote": "Диспетчер показывает текущий процесс на встрече и проверяет результат раз в неделю."
+              }
+            ]
+          }
+        }
+      },
+      "score": {
+        "total": 100.0,
+        "level": "priority",
+        "breakdown": [
+          {
+            "criterion": "Название",
+            "field": "title",
+            "points": 0.0,
+            "max": 0.0,
+            "reason": "Название не влияет на рейтинг"
+          },
+          {
+            "criterion": "Контекст",
+            "field": "context",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Потребность",
+            "field": "need",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Пользователи",
+            "field": "users",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Данные и материалы",
+            "field": "data",
+            "points": 20.0,
+            "max": 20.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Ограничения",
+            "field": "constraints",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Ожидаемый результат",
+            "field": "expected_result",
+            "points": 15.0,
+            "max": 15.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Критерии успеха",
+            "field": "success_criteria",
+            "points": 15.0,
+            "max": 15.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Контакт",
+            "field": "contact",
+            "points": 5.0,
+            "max": 5.0,
+            "reason": "Указан контакт"
+          },
+          {
+            "criterion": "Формат взаимодействия",
+            "field": "interaction_format",
+            "points": 5.0,
+            "max": 5.0,
+            "reason": "Сведения заполнены и подтверждены"
+          }
+        ],
+        "missing": []
+      },
+      "created_at": "2026-09-23T08:04:00+00:00",
+      "published_at": "2026-09-23T08:04:00+00:00",
+      "sources": {
+        "draft": "Доставка идёт долго. Хотим понятный план маршрутов, есть XLSX заказов и ограничения водителя.",
+        "seed-title": "Планировщик доставки",
+        "seed-context": "Диспетчер небольшой службы доставки вручную распределяет адреса между двумя маршрутами.",
+        "seed-need": "Помочь диспетчеру составлять маршруты с учётом времени доставки и вместимости.",
+        "seed-users": "Диспетчер службы доставки и руководитель смены.",
+        "seed-data": "Синтетический XLSX с 40 заказами: координаты, объём и допустимый интервал доставки.",
+        "seed-constraints": "Срок 4 недели; не более двух машин, каждая вместимостью 20 условных единиц.",
+        "seed-expected_result": "Редактируемый план двух маршрутов с видимыми нарушениями заданных ограничений.",
+        "seed-success_criteria": "На тестовом наборе 40 заказов нет превышения вместимости и все интервалы проверены.",
+        "seed-contact": "routes@example.test",
+        "seed-interaction_format": "Диспетчер показывает текущий процесс на встрече и проверяет результат раз в неделю."
+      },
+      "revision": 0
+    },
+    {
+      "id": "draft-5",
+      "text": "Музею нужна страница событий. Есть календарь и описания, важна доступность информации.",
+      "industry": "Культура",
+      "status": "draft",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "context": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "need": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "users": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "data": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "constraints": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "expected_result": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "success_criteria": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "contact": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          },
+          "interaction_format": {
+            "value": "",
+            "status": "empty",
+            "sources": []
+          }
+        }
+      },
+      "score": {
+        "total": 0.0,
+        "level": "draft",
+        "breakdown": [],
+        "missing": []
+      },
+      "created_at": "2026-09-23T08:05:00+00:00",
+      "published_at": null,
+      "sources": {
+        "draft": "Музею нужна страница событий. Есть календарь и описания, важна доступность информации."
+      },
+      "revision": 0
+    },
+    {
+      "id": "task-5",
+      "text": "Музею нужна страница событий. Есть календарь и описания, важна доступность информации.",
+      "industry": "Культура",
+      "status": "published",
+      "card": {
+        "fields": {
+          "title": {
+            "value": "Навигатор музейных событий",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-title",
+                "quote": "Навигатор музейных событий"
+              }
+            ]
+          },
+          "context": {
+            "value": "События музея публикуются в разных каналах, посетителям трудно найти актуальное расписание.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-context",
+                "quote": "События музея публикуются в разных каналах, посетителям трудно найти актуальное расписание."
+              }
+            ]
+          },
+          "need": {
+            "value": "Объединить события в доступном каталоге с фильтрами по дате и формату посещения.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-need",
+                "quote": "Объединить события в доступном каталоге с фильтрами по дате и формату посещения."
+              }
+            ]
+          },
+          "users": {
+            "value": "Посетители музея и сотрудники информационной стойки.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-users",
+                "quote": "Посетители музея и сотрудники информационной стойки."
+              }
+            ]
+          },
+          "data": {
+            "value": "JSON с 20 вымышленными событиями, датами, описаниями и ссылками на материалы.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-data",
+                "quote": "JSON с 20 вымышленными событиями, датами, описаниями и ссылками на материалы."
+              }
+            ]
+          },
+          "constraints": {
+            "value": "Срок 2 недели; браузерное приложение без регистрации и без сбора персональных данных.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-constraints",
+                "quote": "Срок 2 недели; браузерное приложение без регистрации и без сбора персональных данных."
+              }
+            ]
+          },
+          "expected_result": {
+            "value": "Страница каталога событий с понятным расписанием и поиском по названию.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-expected_result",
+                "quote": "Страница каталога событий с понятным расписанием и поиском по названию."
+              }
+            ]
+          },
+          "success_criteria": {
+            "value": "Все 20 событий доступны; поиск и фильтры проходят не менее 6 тестовых сценариев.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-success_criteria",
+                "quote": "Все 20 событий доступны; поиск и фильтры проходят не менее 6 тестовых сценариев."
+              }
+            ]
+          },
+          "contact": {
+            "value": "museum@example.test",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-contact",
+                "quote": "museum@example.test"
+              }
+            ]
+          },
+          "interaction_format": {
+            "value": "Сотрудник музея проверяет макет и отвечает на вопросы по электронной почте раз в два дня.",
+            "status": "confirmed",
+            "sources": [
+              {
+                "source_id": "seed-interaction_format",
+                "quote": "Сотрудник музея проверяет макет и отвечает на вопросы по электронной почте раз в два дня."
+              }
+            ]
+          }
+        }
+      },
+      "score": {
+        "total": 100.0,
+        "level": "priority",
+        "breakdown": [
+          {
+            "criterion": "Название",
+            "field": "title",
+            "points": 0.0,
+            "max": 0.0,
+            "reason": "Название не влияет на рейтинг"
+          },
+          {
+            "criterion": "Контекст",
+            "field": "context",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Потребность",
+            "field": "need",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Пользователи",
+            "field": "users",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Данные и материалы",
+            "field": "data",
+            "points": 20.0,
+            "max": 20.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Ограничения",
+            "field": "constraints",
+            "points": 10.0,
+            "max": 10.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Ожидаемый результат",
+            "field": "expected_result",
+            "points": 15.0,
+            "max": 15.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Критерии успеха",
+            "field": "success_criteria",
+            "points": 15.0,
+            "max": 15.0,
+            "reason": "Сведения заполнены и подтверждены"
+          },
+          {
+            "criterion": "Контакт",
+            "field": "contact",
+            "points": 5.0,
+            "max": 5.0,
+            "reason": "Указан контакт"
+          },
+          {
+            "criterion": "Формат взаимодействия",
+            "field": "interaction_format",
+            "points": 5.0,
+            "max": 5.0,
+            "reason": "Сведения заполнены и подтверждены"
+          }
+        ],
+        "missing": []
+      },
+      "created_at": "2026-09-23T08:05:00+00:00",
+      "published_at": "2026-09-23T08:05:00+00:00",
+      "sources": {
+        "draft": "Музею нужна страница событий. Есть календарь и описания, важна доступность информации.",
+        "seed-title": "Навигатор музейных событий",
+        "seed-context": "События музея публикуются в разных каналах, посетителям трудно найти актуальное расписание.",
+        "seed-need": "Объединить события в доступном каталоге с фильтрами по дате и формату посещения.",
+        "seed-users": "Посетители музея и сотрудники информационной стойки.",
+        "seed-data": "JSON с 20 вымышленными событиями, датами, описаниями и ссылками на материалы.",
+        "seed-constraints": "Срок 2 недели; браузерное приложение без регистрации и без сбора персональных данных.",
+        "seed-expected_result": "Страница каталога событий с понятным расписанием и поиском по названию.",
+        "seed-success_criteria": "Все 20 событий доступны; поиск и фильтры проходят не менее 6 тестовых сценариев.",
+        "seed-contact": "museum@example.test",
+        "seed-interaction_format": "Сотрудник музея проверяет макет и отвечает на вопросы по электронной почте раз в два дня."
+      },
+      "revision": 0
+    }
+  ],
+  "teams": [
+    {
+      "id": "team-1",
+      "name": "Qadam",
+      "interests": [
+        "Образование"
+      ],
+      "skills": [
+        "Анализ данных",
+        "Веб-разработка"
+      ],
+      "technologies": [
+        "Python",
+        "React",
+        "SQLite"
+      ],
+      "points": 0
+    },
+    {
+      "id": "team-2",
+      "name": "Data Qanat",
+      "interests": [
+        "Торговля"
+      ],
+      "skills": [
+        "Анализ данных",
+        "Веб-разработка"
+      ],
+      "technologies": [
+        "Python",
+        "React",
+        "SQLite"
+      ],
+      "points": 0
+    },
+    {
+      "id": "team-3",
+      "name": "Jasyl Lab",
+      "interests": [
+        "Экология"
+      ],
+      "skills": [
+        "Анализ данных",
+        "Веб-разработка"
+      ],
+      "technologies": [
+        "Python",
+        "React",
+        "SQLite"
+      ],
+      "points": 0
+    },
+    {
+      "id": "team-4",
+      "name": "Route Makers",
+      "interests": [
+        "Логистика"
+      ],
+      "skills": [
+        "Анализ данных",
+        "Веб-разработка"
+      ],
+      "technologies": [
+        "Python",
+        "React",
+        "SQLite"
+      ],
+      "points": 0
+    },
+    {
+      "id": "team-5",
+      "name": "Madeniet Tech",
+      "interests": [
+        "Культура"
+      ],
+      "skills": [
+        "Анализ данных",
+        "Веб-разработка"
+      ],
+      "technologies": [
+        "Python",
+        "React",
+        "SQLite"
+      ],
+      "points": 0
+    }
+  ],
+  "proposals": [
+    {
+      "id": "proposal-1",
+      "task_id": "task-1",
+      "team_id": "team-1",
+      "idea": "Создадим проверяемый прототип: помощник учебного центра.",
+      "plan": "Уточнить доступные материалы, собрать прототип, проверить критерии и показать результат.",
+      "deadline": "3 недели после согласования",
+      "link": "https://example.test/prototypes/1",
+      "decision": "pending",
+      "stage_confirmed": false,
+      "created_at": "2026-09-23T08:01:00+00:00"
+    },
+    {
+      "id": "proposal-2",
+      "task_id": "task-2",
+      "team_id": "team-2",
+      "idea": "Создадим проверяемый прототип: прогноз остатков магазина.",
+      "plan": "Уточнить доступные материалы, собрать прототип, проверить критерии и показать результат.",
+      "deadline": "3 недели после согласования",
+      "link": "https://example.test/prototypes/2",
+      "decision": "pending",
+      "stage_confirmed": false,
+      "created_at": "2026-09-23T08:02:00+00:00"
+    },
+    {
+      "id": "proposal-3",
+      "task_id": "task-3",
+      "team_id": "team-3",
+      "idea": "Создадим проверяемый прототип: карта точек переработки.",
+      "plan": "Уточнить доступные материалы, собрать прототип, проверить критерии и показать результат.",
+      "deadline": "3 недели после согласования",
+      "link": "https://example.test/prototypes/3",
+      "decision": "pending",
+      "stage_confirmed": false,
+      "created_at": "2026-09-23T08:03:00+00:00"
+    },
+    {
+      "id": "proposal-4",
+      "task_id": "task-4",
+      "team_id": "team-4",
+      "idea": "Создадим проверяемый прототип: планировщик доставки.",
+      "plan": "Уточнить доступные материалы, собрать прототип, проверить критерии и показать результат.",
+      "deadline": "3 недели после согласования",
+      "link": "https://example.test/prototypes/4",
+      "decision": "pending",
+      "stage_confirmed": false,
+      "created_at": "2026-09-23T08:04:00+00:00"
+    },
+    {
+      "id": "proposal-5",
+      "task_id": "task-5",
+      "team_id": "team-5",
+      "idea": "Создадим проверяемый прототип: навигатор музейных событий.",
+      "plan": "Уточнить доступные материалы, собрать прототип, проверить критерии и показать результат.",
+      "deadline": "3 недели после согласования",
+      "link": "https://example.test/prototypes/5",
+      "decision": "pending",
+      "stage_confirmed": false,
+      "created_at": "2026-09-23T08:05:00+00:00"
+    }
+  ]
+}
