@@ -18,37 +18,37 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 class Assertion(Strict):
-    id: str
-    value: str
-    sources: list[Source]
+    id: str = Field(description="Unique assertion identifier, e.g. a1; not source text")
+    value: str = Field(description="Verbatim complete source or sentence with original punctuation and negation")
+    sources: list[Source] = Field(description="Citations: source_id names a supplied source; quote equals the full sentence/source")
 
 class Candidate(Strict):
-    id: str
-    kind: str
-    field: FieldName
-    interpretation: str
-    evidence: list[str]
+    id: str = Field(description="Unique candidate ID, e.g. c1")
+    kind: str = Field(description="gap, ambiguity or contradiction; never force contradictions")
+    field: FieldName = Field(description="Card field requiring clarification, excluding contact")
+    interpretation: str = Field(description="Russian hypothesis/question rationale, not a new business fact")
+    evidence: list[str] = Field(description="ONLY assertion IDs from assertions[].id, e.g. [a1]. NEVER quotation text or source_id.")
 
 class World(Strict):
     assertions: list[Assertion] = Field(max_length=30)
-    business_need: str
-    student_prerequisites: str
+    business_need: str = Field(description="Russian interpretation of the business need grounded in supplied assertions")
+    student_prerequisites: str = Field(description="Russian opposing need: students need a clear actionable card with data access, scope and acceptance conditions before starting. Do NOT invent student skills or profiles.")
     candidates: list[Candidate] = Field(max_length=15)
 
 class Judgment(Strict):
-    accepted: list[str]
-    explanation: str
+    accepted: list[str] = Field(description="Only candidate IDs from candidates[].id, e.g. c1")
+    explanation: str = Field(description="Russian explanation of the judgment")
 
 class Ask(Strict):
-    candidate_id: str
-    question: str
+    candidate_id: str = Field(description="An accepted candidate ID, e.g. c1, never quote text")
+    question: str = Field(description="A clear Russian question, without assumed facts")
 
 class Questions(Strict):
     questions: list[Ask] = Field(min_length=3, max_length=5)
 
 class CardJudgment(Strict):
     accepted: bool
-    explanation: str
+    explanation: str = Field(description="Russian explanation; concrete failure evidence if rejected")
 
 
 def config():
@@ -167,13 +167,18 @@ async def advance(service, task_id):
     # The previous world remains inspectable; new answers revise it instead of looping.
     payload = {"sources": ctx["sources"], "round": ctx["round"], "previous_world": ctx.get("world"),
                "answered_fields": list(ctx["answers"])}
-    world = await call(service, task_id, "actor",
-        "BUILD_WORLD then DEVELOP_OPPOSITION. Assertions must be entire sources or complete sentences cited verbatim, preserving punctuation and negation. Business need and student prerequisites are explicitly interpretations. Discover missing prerequisites, ambiguity or actual conflicting assertions. Never force contradictions. Include useful gap candidates if information is missing. Do not ask personal/contact questions. Reassess previous world against new answers; do not repeat answered-field questions.", World, payload)
-    try:
-        validate_world(world, ctx["sources"])
-    except ValueError as exc:
-        emit(service, task_id, "validation_failed", kind="source", failure=str(exc))
-        raise SourceFailure(str(exc)) from exc
+    world_instruction = "BUILD_WORLD then DEVELOP_OPPOSITION. Write all interpretations in Russian. Assertions must be entire sources or complete sentences cited verbatim, preserving punctuation and negation. Business need and student prerequisites are explicitly interpretations. The student opposite is the need to start work from a clear actionable task, not a made-up student skill profile. Discover missing prerequisites, ambiguity or actual conflicting assertions. Never force contradictions. Include useful gap candidates if information is missing. Do not ask personal/contact questions. Reassess previous world against new answers; do not repeat answered-field questions. Candidate evidence contains assertion IDs, NEVER quotation text: example assertions:[{id:a1,value:<complete user sentence>,sources:[{source_id:draft,quote:<same sentence>}]}], candidates:[{id:c1,kind:gap,field:data,interpretation:<Russian rationale>,evidence:[a1]}]."
+    while True:
+        world = await call(service, task_id, "actor", world_instruction, World, payload)
+        try:
+            validate_world(world, ctx["sources"])
+            break
+        except ValueError as exc:
+            evidence = {"kind": "source", "failure": str(exc), "invalid_output": world.model_dump(),
+                        "allowed_assertion_ids": [a.id for a in world.assertions]}
+            emit(service, task_id, "validation_failed", **evidence)
+            reserve_correction(service, task_id, evidence)
+            payload = {**payload, "correction": evidence}
     judgment = await call(service, task_id, "judge",
         "JUDGE candidates: accept only useful, source-grounded gaps/ambiguities or plausible contradictions. Do not invent contradiction for scoring. Return accepted candidate IDs only and a short methodological explanation.", Judgment,
         {"sources": ctx["sources"], "world": world.model_dump()})

@@ -91,6 +91,35 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
             engine.reserve_correction(service,"t",{"kind":"semantic","failure":"still wrong"})
         await service.close()
 
+    async def test_observed_quote_instead_of_evidence_id_is_corrected_once(self):
+        # Actual failure from live trace 7c2a0d5713f84c6ca78dbe4ebcbb8d41:
+        # Pydantic accepted quotation strings as evidence, graph validation rejected them.
+        quote="Хотим чат-бота на ИИ для клиентов, данных пока нет, нужно к следующему месяцу."
+        store=Store();store.task.text=quote
+        service=TaskRunService(store);attempts=[]
+        async def fake_call(s,tid,role,instruction,schema,payload):
+            s.runs[tid].calls+=1
+            if schema is engine.World:
+                attempts.append(payload)
+                world=make_world();world.assertions[0].value=quote
+                world.assertions[0].sources=[Source(source_id="draft",quote=quote)]
+                if len(attempts)==1:
+                    for candidate in world.candidates: candidate.evidence=[quote]
+                return world
+            if schema is engine.Judgment:
+                return engine.Judgment(accepted=["data","users","constraints"],explanation="Нужны уточнения")
+            return engine.Questions(questions=[engine.Ask(candidate_id=k,question=f"Уточните {k}?") for k in ["data","users","constraints"]])
+        with patch.dict(os.environ,ENV),patch.object(engine,"call",fake_call):
+            service.start("t","engine");await service.jobs["t"]
+            self.assertEqual(service.get("t").status,"waiting_answers")
+            self.assertEqual(len(attempts),2)
+            evidence=attempts[1]["correction"]
+            self.assertEqual(evidence["failure"],"Candidate must reference source-grounded assertions")
+            self.assertEqual(evidence["invalid_output"]["candidates"][0]["evidence"],[quote])
+            self.assertEqual(evidence["allowed_assertion_ids"],["a"])
+            self.assertEqual(service.contexts["t"]["corrections"],1)
+        await service.close()
+
     async def test_call_budget_enforced_before_http(self):
         service=TaskRunService(Store()); service.start("t","stub"); await service.jobs["t"]
         service.get("t").calls=12
