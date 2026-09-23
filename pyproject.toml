@@ -18,6 +18,10 @@ sana = "app.launcher:main"
 [tool.setuptools.packages.find]
 include = ["app*", "engines*", "bench*"]
 
+[tool.setuptools.package-data]
+"engines.light" = ["prompts/*.md"]
+"engines.heavy" = ["prompts/*.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

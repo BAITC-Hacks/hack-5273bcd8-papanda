@@ -1,5 +1,7 @@
 """Thin HTTP adapter for the frozen engine contract."""
+import json
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response
 
 from . import get_engine
 from .common.contracts import AnswersPayload, StartRequest
@@ -44,7 +46,9 @@ async def cancel(run_id: str):
 
 @app.get("/engine/runs/{run_id}/trace")
 def trace(run_id: str):
-    return locate(run_id).trace(run_id)
+    records = locate(run_id).trace(run_id)
+    return Response("\n".join(json.dumps(row, ensure_ascii=False) for row in records) + "\n",
+                    media_type="application/x-ndjson")
 
 
 @app.get("/engine/contract")

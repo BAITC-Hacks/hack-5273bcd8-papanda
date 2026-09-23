@@ -1,6 +1,9 @@
 """Stable in-process entry point. Engines are configured once per process."""
 import os
 from typing import Protocol
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 from .common.contracts import Answer, RunView, StartRequest
 
@@ -19,6 +22,7 @@ _instances: dict[str, Engine] = {}
 
 
 def get_engine(name: str | None = None) -> Engine:
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
     chosen = name or os.getenv("ENGINE", "light")
     if chosen not in {"light", "heavy"}:
         raise ValueError("ENGINE должен быть light или heavy")
