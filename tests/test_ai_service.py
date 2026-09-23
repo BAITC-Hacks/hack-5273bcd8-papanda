@@ -43,15 +43,6 @@ class GroundingTests(unittest.TestCase):
         # Missing constraints and interaction_format are valid unknowns.
         self.assertEqual(card.fields[FieldName.constraints].value,"")
 
-    def test_judge_contract_separates_faithfulness_from_readiness(self):
-        contract=TaskRunService(Store()).contract()
-        self.assertIn("Missing fields alone MUST NEVER cause rejection",contract["card_review_prompt"])
-        self.assertIn("Reject unsupported facts",contract["card_review_prompt"])
-        self.assertIn("НЕ интерфейс",contract["field_semantics"]["interaction_format"])
-
-    def test_contract_executes_validation(self):
-        self.assertTrue(TaskRunService(Store()).contract()["validation"]["accepted_passed"])
-
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self): self.store=Store(); self.service=TaskRunService(self.store)
     async def asyncTearDown(self): await self.service.close()
@@ -139,7 +130,7 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_contact_in_free_text_rejected_before_run(self):
         self.store.task.text="Нужен отчёт. Пишите old@example.com"
         with self.assertRaisesRegex(ValueError,"contact"):
-            self.service.start("t","engine")
+            self.service.start("t","light")
         self.assertNotIn("t",self.service.runs)
 
     async def test_stale_question_ids(self):
@@ -151,7 +142,10 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.service.submit_answers("t", [Answer(answer_id=q.answer_id, answer="x") for q in self.service.get("t").pending_questions])
     async def test_no_engine_configuration_does_not_fake_success(self):
-        self.service.start("t", "engine"); await self.advance()
+        # Engine imports may load the real .env; keep this test offline and unconfigured.
+        import engines
+        with patch.dict(os.environ,{"OPENAI_API_KEY":"","ACTOR_MODEL":"","JUDGE_MODEL":""}), patch.dict(engines._instances,clear=True):
+            self.service.start("t", "light"); await self.advance()
         self.assertEqual(self.service.get("t").status,"error")
 
 if __name__ == "__main__": unittest.main()

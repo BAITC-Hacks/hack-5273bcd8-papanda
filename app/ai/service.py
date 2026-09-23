@@ -1,11 +1,11 @@
-"""Bounded task runs with explicit deterministic stub and strict source gate."""
+"""Bounded task runs: the light engine or the explicit deterministic stub, behind a strict source gate."""
 import asyncio
 import os
 import time
 from uuid import uuid4
 from app.contracts import (Answer, Card, CardField, FieldName, FIELD_WEIGHTS,
     GraphNode, GraphEdge, Question, RunState, Source)
-from .validation import validate_card, contains_contact, validate_assignments
+from .validation import validate_card, contains_contact, validate_assignments, is_unknown_answer
 from .events import emit, SchemaFailure, SourceFailure, SemanticRejection, BudgetExhausted
 
 QUESTIONS = {
@@ -63,9 +63,9 @@ class TaskRunService:
         if self.get(task_id).status in {"analyzing", "building_card", "waiting_answers"}:
             raise ValueError("A run is already active")
         mode = mode or os.getenv("AI_MODE", "stub")
-        if mode == "engine" and os.getenv("ENGINE") in {"light", "heavy"}:
-            mode = os.environ["ENGINE"]
-        if mode not in {"stub", "engine", "light", "heavy"}:
+        if mode == "engine":  # configuration alias for the light engine
+            mode = "light"
+        if mode not in {"stub", "light"}:
             raise ValueError("Unsupported AI mode")
         contact = task.card.fields[FieldName.contact].value
         if contains_contact(task.text, contact):
@@ -91,17 +91,13 @@ class TaskRunService:
             max(0.0, self.contexts[task_id]["deadline"] - time.monotonic()), self._expire, task_id)
         emit(self, task_id, "run_started", state=state.model_dump())
         self.jobs[task_id] = asyncio.create_task(
-            self._advance_external(task_id) if mode in {"light", "heavy"} else self._advance(task_id))
+            self._advance_external(task_id) if mode == "light" else self._advance(task_id))
         return state
 
     async def _advance(self, task_id):
         state, ctx = self.runs[task_id], self.contexts[task_id]
         try:
-            if state.mode == "engine":
-                from .engine import advance
-                await advance(self, task_id)
-            else:
-                self._stub(task_id)
+            self._stub(task_id)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -119,12 +115,13 @@ class TaskRunService:
             emit(self, task_id, "state_transition", state=state.model_dump())
 
     async def _advance_external(self, task_id):
-        """Translate either frozen engine contract into the existing product API."""
-        from engines import get_engine
-        from engines.common.contracts import StartRequest
+        """Translate the light engine contract into the existing product API."""
         state, ctx = self.runs[task_id], self.contexts[task_id]
         engine = None
         try:
+            # Imported inside try: any failure must end the run visibly, not leave it "analyzing".
+            from engines import get_engine
+            from engines.common.contracts import StartRequest
             engine = get_engine(state.mode)
             task = self.store.get_task(task_id)
             engine_id = await engine.start(StartRequest(
@@ -144,7 +141,8 @@ class TaskRunService:
                                 value=field.value, status="ai_proposed",
                                 sources=[Source(source_id=s.source_id, quote=s.quote) for s in field.sources],
                             )
-                    self._commit(task_id, card)
+                    # Engine formulations are re-checked here against their cited quotes.
+                    self._commit(task_id, card, formulation=True)
                     break
                 if view.status in {"failed", "cancelled"}:
                     state.status = "error"
@@ -174,7 +172,9 @@ class TaskRunService:
             why=q.why, points_at_stake=q.points_at_stake, node_id=q.question_id,
         ) for q in view.pending_questions]
         state.graph = Graph(
-            nodes=[GraphNode(id=n.id, kind=n.kind, label=n.label,
+            # Elements carry their side; keep it visible as business fact vs team need.
+            nodes=[GraphNode(id=n.id, kind={"simplest": "business_fact", "opposite": "team_need"}.get(n.side, n.kind)
+                             if n.kind == "element" else n.kind, label=n.label,
                              status=n.status or "proposed") for n in view.graph.nodes],
             edges=[GraphEdge(source=e.source, target=e.target, label=e.kind) for e in view.graph.edges],
         )
@@ -216,12 +216,12 @@ class TaskRunService:
                     card.fields[FieldName(field)] = CardField(value=value, status="ai_proposed", sources=[Source(source_id=source_id, quote=value)])
             self._commit(task_id, card)
 
-    def _commit(self, task_id, card):
+    def _commit(self, task_id, card, formulation=False):
         state, ctx = self.runs[task_id], self.contexts[task_id]
         self._expire(task_id)
         if state.status == "error":
             raise ValueError("Run expired before commit")
-        validate_card(card, ctx["sources"])
+        validate_card(card, ctx["sources"], formulation)
         validate_assignments(card, ctx["answers"])
         emit(self, task_id, "card_source_validation_passed", card=card.model_dump())
         task = self.store.get_task(task_id)
@@ -261,7 +261,7 @@ class TaskRunService:
         contact = self.store.get_task(task_id).card.fields[FieldName.contact].value
         if any(contains_contact(a.answer, contact) for a in answers):
             raise ValueError("Remove contact details from answers; use the manual contact field")
-        if state.mode in {"light", "heavy"}:
+        if state.mode == "light":
             from engines.common.contracts import Answer as EngineAnswer
             engine = ctx.get("engine")
             engine_id = ctx.get("engine_id")
@@ -274,7 +274,8 @@ class TaskRunService:
                 ctx["external_answer_index"] = index
                 source_id = f"A{index}"
                 ctx["sources"][source_id] = answer.answer
-                ctx["answers"][q.field.value] = source_id
+                if not is_unknown_answer(answer.answer):
+                    ctx["answers"][q.field.value] = source_id
                 converted.append(EngineAnswer(question_id=answer.answer_id, text=answer.answer))
             await engine.submit_answers(engine_id, converted)
             self._copy_external_view(state, engine.view(engine_id))
@@ -301,6 +302,3 @@ class TaskRunService:
                 job.cancel()
         await asyncio.gather(*self.jobs.values(), return_exceptions=True)
 
-    def contract(self):
-        from .prompts import contract
-        return contract()

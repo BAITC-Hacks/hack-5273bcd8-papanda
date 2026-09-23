@@ -19,8 +19,8 @@ def create_app(db_path=None, ai_mode=None):
     root = Path(__file__).resolve().parents[2]
     load_dotenv(root / ".env")
     mode = ai_mode or os.getenv("AI_MODE", "stub")
-    if mode not in {"stub", "engine", "light", "heavy"}:
-        raise ValueError("AI_MODE must be stub, engine, light or heavy")
+    if mode not in {"stub", "engine", "light"}:
+        raise ValueError("AI_MODE must be stub, engine or light")
     store = Store(str(db_path or os.getenv("SANA_DB") or os.getenv("DB_PATH") or root / "data" / "sana.db"))
     try:
         store.seed()
@@ -64,8 +64,7 @@ def create_app(db_path=None, ai_mode=None):
 
     @app.get("/api/health")
     async def health():
-        selected = os.getenv("ENGINE") if mode == "engine" and os.getenv("ENGINE") in {"light", "heavy"} else mode
-        return {"status": "ok", "ai_mode": selected, "version": 1}
+        return {"status": "ok", "ai_mode": "light" if mode == "engine" else mode, "version": 1}
 
     @app.post("/api/tasks", status_code=201)
     async def create_task(body: TaskCreate):
@@ -160,7 +159,11 @@ def create_app(db_path=None, ai_mode=None):
     async def stage(proposal_id: str, body: StageRequest): return store.confirm_stage(proposal_id)
 
     @app.get("/api/ai/contract")
-    async def ai_contract(): return service().contract()
+    async def ai_contract():
+        from engines import get_engine
+        from engines.common.contracts import StartRequest, RunView
+        return {"engine": "light", "input_schema": StartRequest.model_json_schema(),
+                "output_schema": RunView.model_json_schema(), **get_engine("light").contract()}
 
     @app.get("/{path:path}", include_in_schema=False)
     async def frontend(path: str):

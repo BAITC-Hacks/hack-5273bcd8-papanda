@@ -71,7 +71,7 @@ RunStatus = Literal["analyzing", "waiting_answers", "building_card", "card_ready
 class RunView(BaseModel):
     run_id: str
     task_id: str
-    engine: Literal["light", "heavy"]
+    engine: Literal["light"]
     status: RunStatus
     pending_questions: list[Question] = Field(default_factory=list)
     card: CardDraft | None = None

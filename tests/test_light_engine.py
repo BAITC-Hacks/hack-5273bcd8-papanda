@@ -57,7 +57,8 @@ class LightTests(unittest.IsolatedAsyncioTestCase):
         await self.answer(engine,rid);state=await wait_status(engine,rid,"card_ready")
         self.assertEqual(validate_card(state.card,engine.contexts[rid]["sources"]),[])
         self.assertIsNone(state.card.fields["constraints"].value)
-        self.assertEqual(state.metrics["llm_calls"],3)
+        # The fourth call is the formulation step; without output it keeps the quotes.
+        self.assertEqual(state.metrics["llm_calls"],4)
         self.assertIn("card_validated",[e["event"] for e in engine.trace(rid)])
     async def test_broken_json_repaired(self):
         engine=self.make_engine(["broken json",analysis_fixture(),card_fixture()]);rid=await engine.start(StartRequest(task_id="t",draft=DRAFT,field_weights=WEIGHTS))
@@ -87,7 +88,8 @@ class LightTests(unittest.IsolatedAsyncioTestCase):
         await engine.cancel(a);self.assertEqual(engine.view(a).status,"cancelled");self.assertEqual(engine.view(b).status,"waiting_answers");await engine.cancel(b)
     async def test_second_round_reassesses_new_gap(self):
         follow={"questions":[{"id":"Q4","text":"Какие данные доступны сейчас?","field":"data","contradiction_id":"C1","why":"Уточнение нового пробела"}]}
-        actor=ScriptedLLM([json.dumps(x,ensure_ascii=False) for x in [analysis_fixture(),card_fixture(relation="new_gap"),follow,card_fixture()]])
+        final=card_fixture();final["card"]["fields"]["data"]["sources"][0]["source_id"]="A4"
+        actor=ScriptedLLM([json.dumps(x,ensure_ascii=False) for x in [analysis_fixture(),card_fixture(relation="new_gap"),follow,final]])
         engine=LightEngine(actor=actor,judge=ScriptedLLM(['{"accepted":true,"issues":[]}']),max_rounds=2)
         rid=await engine.start(StartRequest(task_id="t",draft=DRAFT,field_weights=WEIGHTS));await self.answer(engine,rid)
         for _ in range(100):
@@ -96,7 +98,20 @@ class LightTests(unittest.IsolatedAsyncioTestCase):
         await engine.submit_answers(rid,[Answer(question_id="Q4",text="Доступен CSV")])
         state=await wait_status(engine,rid,"card_ready")
         self.assertEqual(state.metrics["rounds"],2)
-        self.assertEqual(state.metrics["llm_calls"],5)
+        self.assertEqual(state.metrics["llm_calls"],6)
+    async def test_formulation_is_checked_and_falls_back(self):
+        good={"fields":{"data":"Есть доступный CSV"},"title":"Помощник клиентам","title_quote":"Нужен помощник клиентам."}
+        engine=self.make_engine([analysis_fixture(),card_fixture(),good],judge=ScriptedLLM(['{"accepted":true,"issues":[]}','{"rejected":[]}']))
+        rid=await engine.start(StartRequest(task_id="t",draft=DRAFT,field_weights=WEIGHTS));await self.answer(engine,rid)
+        state=await wait_status(engine,rid,"card_ready")
+        self.assertEqual(state.card.fields["data"].value,"Есть доступный CSV")
+        self.assertEqual(state.card.fields["data"].sources[0].quote,"Доступен CSV")
+        self.assertEqual(state.card.fields["title"].value,"Помощник клиентам")
+        invented={"fields":{"data":"Доступен CSV на 500 строк"}}
+        engine=self.make_engine([analysis_fixture(),card_fixture(),invented])
+        rid=await engine.start(StartRequest(task_id="t",draft=DRAFT,field_weights=WEIGHTS));await self.answer(engine,rid)
+        state=await wait_status(engine,rid,"card_ready")
+        self.assertEqual(state.card.fields["data"].value,"Доступен CSV")
     async def test_judge_rejection_has_one_actor_correction(self):
         judge=ScriptedLLM(['{"accepted":false,"issues":[{"target_id":"Q1","problem":"Уточните вопрос"}]}'])
         engine=self.make_engine([analysis_fixture(),analysis_fixture(),card_fixture()],judge=judge)

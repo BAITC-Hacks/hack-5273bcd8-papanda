@@ -64,5 +64,17 @@ class AssessedCard(Strict):
     assessment: list[Assessment]
     card: CardDraft
 
+class Formulation(Strict):
+    fields: dict[FieldName, str] = Field(default_factory=dict)
+    title: str | None = None
+    title_quote: str | None = None
+
+class FormulationIssue(Strict):
+    field: FieldName
+    problem: str
+
+class FormulationReview(Strict):
+    rejected: list[FormulationIssue] = Field(default_factory=list)
+
 class Followup(Strict):
     questions: list[PlannedQuestion] = Field(min_length=1, max_length=3)

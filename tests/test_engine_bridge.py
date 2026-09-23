@@ -12,7 +12,6 @@ from app.contracts import Answer as ProductAnswer, Task
 from engines.common.llm import ScriptedLLM
 from engines.light import LightEngine
 from test_light_engine import DRAFT, analysis_fixture, card_fixture
-from test_heavy_engine import DRAFT as HEAVY_DRAFT, make_heavy
 
 
 class MemoryStore:
@@ -65,40 +64,18 @@ async def test_light_engine_to_product_unconfirmed_card():
 
 
 @pytest.mark.asyncio
-async def test_heavy_engine_to_product_unconfirmed_card():
-    engine = make_heavy()
-    store = MemoryStore()
-    store.task.text = HEAVY_DRAFT
-    service = TaskRunService(store)
-    with patch("engines.get_engine", return_value=engine):
-        try:
-            service.start("t", "heavy")
-            waiting = await wait_for(service, "waiting_answers")
-            assert len(waiting.pending_questions) >= 3
-            answers = {"data": "Есть список вопросов", "users": "Клиенты",
-                       "success_criteria": "Меньше звонков"}
-            await service.submit_answers("t", [ProductAnswer(
-                answer_id=q.answer_id, answer=answers[q.field.value])
-                for q in waiting.pending_questions])
-            ready = await wait_for(service, "card_ready")
-            assert ready.mode == "heavy"
-            assert ready.card_draft.fields["data"].value == "Есть список вопросов"
-            assert ready.card_draft.fields["data"].status == "ai_proposed"
-            assert ready.calls > 0
-        finally:
-            await service.close()
-
-
-@pytest.mark.asyncio
-async def test_heavy_engine_through_product_http_api(tmp_path):
-    engine = make_heavy()
-    app = create_app(db_path=tmp_path / "two-engines.sqlite3", ai_mode="stub")
+async def test_light_engine_through_product_http_api(tmp_path):
+    engine = LightEngine(
+        actor=ScriptedLLM([json.dumps(analysis_fixture(), ensure_ascii=False),
+                           json.dumps(card_fixture(), ensure_ascii=False)]),
+        judge=ScriptedLLM(['{"accepted":true,"issues":[]}']), max_rounds=1,
+    )
+    app = create_app(db_path=tmp_path / "light.sqlite3", ai_mode="stub")
     with patch("engines.get_engine", return_value=engine):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-            task = (await client.post("/api/tasks", json={"text": HEAVY_DRAFT,
-                                                         "industry": "services"})).json()
+            task = (await client.post("/api/tasks", json={"text": DRAFT, "industry": "services"})).json()
             task_id = task["id"]
-            started = await client.post(f"/api/tasks/{task_id}/analyze", json={"mode": "heavy"})
+            started = await client.post(f"/api/tasks/{task_id}/analyze", json={"mode": "light"})
             assert started.status_code == 202
             for _ in range(1000):
                 run = (await client.get(f"/api/tasks/{task_id}/run")).json()
@@ -106,10 +83,8 @@ async def test_heavy_engine_through_product_http_api(tmp_path):
                     break
                 await asyncio.sleep(0.001)
             assert run["status"] == "waiting_answers"
-            answers = {"data": "Есть список вопросов", "users": "Клиенты",
-                       "success_criteria": "Меньше звонков"}
             submitted = await client.post(f"/api/tasks/{task_id}/answers", json={"answers": [
-                {"answer_id": q["answer_id"], "answer": answers[q["field"]]}
+                {"answer_id": q["answer_id"], "answer": "Доступен CSV" if q["field"] == "data" else "Не знаю"}
                 for q in run["pending_questions"]]})
             assert submitted.status_code == 202
             for _ in range(1000):
@@ -119,7 +94,9 @@ async def test_heavy_engine_through_product_http_api(tmp_path):
                 await asyncio.sleep(0.001)
             assert run["status"] == "card_ready"
             persisted = (await client.get(f"/api/tasks/{task_id}")).json()
-            assert persisted["card"]["fields"]["data"]["value"] == "Есть список вопросов"
+            assert persisted["card"]["fields"]["data"]["value"] == "Доступен CSV"
             assert persisted["card"]["fields"]["data"]["status"] == "ai_proposed"
+            # «Не знаю» never becomes a card value.
+            assert all(f["value"] != "Не знаю" for f in persisted["card"]["fields"].values())
         await app.state.service.close()
         app.state.store.close()

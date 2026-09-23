@@ -8,12 +8,12 @@ from pathlib import Path
 from uuid import uuid4
 from pydantic import ValidationError
 from engines.common.contracts import (StartRequest, RunView, GraphNode, GraphEdge, Question,
-    Answer, CardField, CardDraft)
+    Answer, CardField, CardDraft, Source)
 from engines.common.llm import build_role_clients
 from engines.common.channel import AnswerChannel
 from engines.common.provenance import validate_card
 from engines.common.trace import Trace
-from .schemas import Analysis, Critique, AssessedCard, Followup
+from .schemas import Analysis, Critique, AssessedCard, Followup, Formulation, FormulationReview
 
 PROMPTS = Path(__file__).parent / "prompts"
 OPPOSITE = "Студенческая команда начинает работу, зная только карточку"
@@ -44,18 +44,54 @@ def validate_analysis(proposal, draft):
         errors.append("Все ID должны быть уникальными короткими E/C/Q-идентификаторами")
     if len(left)<3 or len(right)<3: errors.append("Нужно минимум 3 элемента у каждой стороны")
     for element in proposal.simplest.elements:
-        if not normalized(element.quote) or normalized(element.quote) not in normalized(draft):
+        quote=normalized(element.quote).rstrip(".!?,;: ")
+        if not quote or quote not in normalized(draft):
             errors.append(f"{element.id}: quote отсутствует в черновике")
     if len(proposal.contradictions)<3: errors.append("Нужно минимум 3 противоречия/пробела")
     for c in proposal.contradictions:
-        if not c.simplest_refs or not set(c.simplest_refs)<=left: errors.append(f"{c.id}: неверные simplest_refs")
-        if not c.opposite_refs or not set(c.opposite_refs)<=right: errors.append(f"{c.id}: неверные opposite_refs")
+        # A gap is information absent from the draft, so it may have no business element.
+        if (not c.simplest_refs and c.kind!="gap") or not set(c.simplest_refs)<=left: errors.append(f"{c.id}: неверные simplest_refs; допустимы только {sorted(left)}")
+        if not c.opposite_refs or not set(c.opposite_refs)<=right: errors.append(f"{c.id}: opposite_refs должен содержать ID из opposite.elements {sorted(right)}; если подходящего условия старта нет, добавь новый элемент opposite с новым E-id и сошлись на него")
         if c.field=="contact": errors.append(f"{c.id}: contact только ручное поле")
     if not 3<=len(proposal.questions)<=5: errors.append("Нужно 3–5 вопросов")
     errors.extend(validate_questions(proposal.questions,{c.id:c for c in proposal.contradictions}))
     if {q.contradiction_id for q in proposal.questions}!={c.id for c in proposal.contradictions}:
         errors.append("Каждое противоречие должно быть покрыто вопросом")
     return errors
+
+
+def product_gate(name, field, ctx):
+    """Apply the product commit gate here, so failures reach the correction loop."""
+    if not field.value: return []
+    quotes=[normalized(s.quote) for s in field.sources]
+    if len(quotes)!=len(set(quotes)):
+        return [{"field":name,"code":"duplicate_quote","message":"Одна и та же цитата повторена; оставь её один раз"}]
+    from app.ai.validation import validate_field, complete_quotes
+    from app.contracts import CardField as ProductField, Source as ProductSource
+    try:
+        validate_field(ProductField(value=field.value,sources=[ProductSource(source_id=s.source_id,quote=s.quote) for s in field.sources]),ctx["sources"])
+    except ValueError as exc:
+        allowed={s.source_id:sorted(complete_quotes(ctx["sources"][s.source_id])) for s in field.sources if s.source_id in ctx["sources"]}
+        return [{"field":name,"code":"product_gate","message":"Цитата должна быть целым источником или полным предложением без изменений: "+str(exc)
+                 +(f". Допустимые quote (value = quote): {json.dumps(allowed,ensure_ascii=False)}" if allowed else "")}]
+    from app.ai.validation import is_unknown_answer
+    latest={f:aid for aid,f in ctx["answer_fields"].items() if not is_unknown_answer(ctx["sources"][aid])}
+    if name in latest and latest[name] not in {s.source_id for s in field.sources}:
+        return [{"field":name,"code":"current_answer","message":f"Поле должно опираться на последний ответ {latest[name]}"}]
+    return []
+
+
+def drop_unknown_answers(card, ctx):
+    """«Не знаю» leaves the gap open; it never becomes a card value."""
+    from app.ai.validation import is_unknown_answer
+    for name,field in card.fields.items():
+        if not field.value: continue
+        known=[s for s in field.sources if not (s.source_id in ctx["answer_fields"] and is_unknown_answer(ctx["sources"][s.source_id]))]
+        if len(known)==len(field.sources): continue
+        if known and normalized(field.value)==normalized(" ".join(s.quote for s in field.sources)):
+            card.fields[name]=CardField(value=" ".join(s.quote for s in known),sources=known)
+        else:
+            card.fields[name]=CardField(value=None)
 
 
 def validate_questions(questions, contradictions, existing=()):
@@ -125,7 +161,7 @@ class LightEngine:
     async def _call(self, run_id, role, prompt, payload, schema):
         state=self.runs[run_id];ctx=self.contexts[run_id]
         if state.metrics["llm_calls"]>=int(os.getenv("LIGHT_MAX_CALLS","10")): raise Rejected("budget",["Исчерпан бюджет вызовов"])
-        remaining=float(os.getenv("LIGHT_DEADLINE_S","45"))-ctx["active_s"]
+        remaining=float(os.getenv("LIGHT_DEADLINE_S","90"))-ctx["active_s"]
         if remaining<=0: raise Rejected("deadline",["Исчерпан бюджет времени модели"])
         client=self.actor if role=="actor" else self.judge
         if client is None: raise Rejected("provider_unavailable",["Провайдер роли не настроен"])
@@ -147,6 +183,7 @@ class LightEngine:
 
     async def _proposal(self,run_id,payload):
         prompt=(PROMPTS/"analyze.md").read_text(encoding="utf-8")
+        proposal=None
         for attempt in range(2):
             try:
                 proposal=await self._call(run_id,"actor",prompt,payload,Analysis)
@@ -159,7 +196,7 @@ class LightEngine:
                 self.runs[run_id].metrics["rejections"]+=1
                 self._event(run_id,"rejected",stage="ANALYZE",reason=exc.reason,errors=exc.errors)
                 if attempt: raise
-                payload={**payload,"correction":exc.errors}
+                payload={**payload,"correction":exc.errors,**({"previous":proposal.model_dump()} if proposal else {})}
 
     def _graph(self,run_id,proposal):
         state=self.runs[run_id]
@@ -222,6 +259,7 @@ class LightEngine:
                     for citation in field.sources:
                         if citation.source_id in ctx["answer_fields"] and ctx["answer_fields"][citation.source_id]!=name:
                             errors.append({"field":name,"code":"wrong_answer_field","message":"Ответ относится к другому полю"})
+                    errors.extend(product_gate(name,field,ctx))
                 self._event(run_id,"card_validated",attempt=attempt+1,errors=errors)
                 if not errors: return result
                 broken={e["field"] for e in errors}
@@ -237,6 +275,52 @@ class LightEngine:
                 state.metrics["rejections"]+=1;self._event(run_id,"rejected",stage="CARD",reason=exc.reason,errors=exc.errors)
                 payload={**payload,"correction":exc.errors}
         raise Rejected("provenance_failed",["Карточка не проверена"])
+
+    async def _formulate(self,run_id,card):
+        """Reword verified quotes for the card; unproven wording falls back to the quote."""
+        from app.ai.validation import validate_formulation, complete_quotes
+        from app.scoring import field_points
+        from app.contracts import FieldName as ProductName
+        ctx=self.contexts[run_id]
+        verified={n:f for n,f in card.fields.items() if f.value and n not in {"contact","title"}}
+        if not verified: return
+        try:
+            draft=await self._call(run_id,"actor",(PROMPTS/"formulate.md").read_text(encoding="utf-8"),
+                {"fields":{n:{"quotes":[s.quote for s in f.sources]} for n,f in verified.items()},"sources":{"draft":ctx["request"].draft}},Formulation)
+        except Exception as exc:
+            self._event(run_id,"rejected",stage="FORMULATE",reason=getattr(exc,"reason",type(exc).__name__));return
+        candidates={};rejected={}
+        for name,value in draft.fields.items():
+            if name not in verified or not value.strip() or normalized(value)==normalized(verified[name].value): continue
+            quotes=[s.quote for s in verified[name].sources]
+            try:
+                validate_formulation(value,quotes)
+                if field_points(ProductName(name),value,True)[0]!=field_points(ProductName(name)," ".join(quotes),True)[0]:
+                    raise ValueError("Формулировка меняет баллы рейтинга")
+                candidates[name]=(value,quotes)
+            except ValueError as exc: rejected[name]=str(exc)
+        if draft.title and draft.title_quote:
+            quote=" ".join(draft.title_quote.split())
+            try:
+                if quote not in complete_quotes(ctx["request"].draft): raise ValueError("title_quote не является предложением черновика")
+                if len(draft.title)>80: raise ValueError("Название длиннее 80 символов")
+                validate_formulation(draft.title,[quote])
+                candidates["title"]=(draft.title,[quote])
+            except ValueError as exc: rejected["title"]=str(exc)
+        if candidates:
+            try:
+                review=await self._call(run_id,"judge",(PROMPTS/"formulate_review.md").read_text(encoding="utf-8"),
+                    {n:{"quotes":q,"formulation":v} for n,(v,q) in candidates.items()},FormulationReview)
+                for issue in review.rejected:
+                    if issue.field in candidates: rejected[issue.field]=issue.problem;candidates.pop(issue.field)
+            except Exception as exc:
+                # Without an independent check keep the verified quotations.
+                rejected.update({n:"Судья недоступен: "+getattr(exc,"reason",type(exc).__name__) for n in candidates});candidates={}
+        for name,(value,quotes) in candidates.items():
+            if name=="title": card.fields["title"]=CardField(value=value,sources=[Source(source_id="draft",quote=quotes[0])])
+            else: card.fields[name].value=value
+        self.runs[run_id].metrics["formulated"]=len(candidates)
+        self._event(run_id,"formulated",accepted=sorted(candidates),rejected=rejected)
 
     async def _run(self,run_id):
         state=self.runs[run_id];ctx=self.contexts[run_id]
@@ -272,6 +356,8 @@ class LightEngine:
                     questions=follow.questions
                 else: break
             for name in FIELDS: result.card.fields.setdefault(name,CardField(value=None))
+            drop_unknown_answers(result.card,ctx)
+            await self._formulate(run_id,result.card)
             state.card=result.card
             for name,field in result.card.fields.items():
                 if field.value is not None:
@@ -287,14 +373,16 @@ class LightEngine:
             state.error="Истекло время ожидания ответа или анализа"
         except Exception as exc:
             state.status="failed";state.stop_reason=exc.reason if isinstance(exc,Rejected) else "provider_unavailable"
-            state.error="Анализ остановлен: " + ("; ".join(map(str,exc.errors)) if isinstance(exc,Rejected) else type(exc).__name__)
+            state.error=("AI вернул ответ, не прошедший проверку, — нажмите «Проверить заново» или заполните карточку вручную. Подробности: "+"; ".join(map(str,exc.errors))[:300]
+                if isinstance(exc,Rejected) else
+                f"Сервис AI сейчас недоступен ({type(exc).__name__}): проверьте ключ API и сеть. Карточку можно заполнить и опубликовать вручную.")
         finally:
             state.pending_questions=[]
             self._event(run_id,"run_finished")
 
     def contract(self):
         return {"engine":"light","prompts":{p.stem:p.read_text(encoding="utf-8") for p in PROMPTS.glob("*.md")},
-            "schemas":{s.__name__:s.model_json_schema() for s in [Analysis,Critique,AssessedCard,Followup]},
+            "schemas":{s.__name__:s.model_json_schema() for s in [Analysis,Critique,AssessedCard,Followup,Formulation,FormulationReview]},
             "invalid_response_examples":self._invalid_examples()}
 
     def _invalid_examples(self):

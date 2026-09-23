@@ -24,13 +24,9 @@ _instances: dict[str, Engine] = {}
 def get_engine(name: str | None = None) -> Engine:
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
     chosen = name or os.getenv("ENGINE", "light")
-    if chosen not in {"light", "heavy"}:
-        raise ValueError("ENGINE должен быть light или heavy")
+    if chosen != "light":
+        raise ValueError("ENGINE должен быть light")
     if chosen not in _instances:
-        if chosen == "light":
-            from .light.engine import LightEngine
-            _instances[chosen] = LightEngine()
-        else:
-            from .heavy.engine import HeavyEngine
-            _instances[chosen] = HeavyEngine()
+        from .light.engine import LightEngine
+        _instances[chosen] = LightEngine()
     return _instances[chosen]

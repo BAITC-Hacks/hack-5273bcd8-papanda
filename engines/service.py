@@ -10,7 +10,7 @@ app = FastAPI(title="AI Sana dialectical engines")
 
 
 def locate(run_id: str):
-    for name in ("light", "heavy"):
+    for name in ("light",):
         engine = get_engine(name)
         try:
             engine.view(run_id)

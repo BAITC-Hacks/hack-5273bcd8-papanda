@@ -180,7 +180,9 @@ class FallbackLLM:
 
 def _make(role: str) -> tuple[LLMClient, tuple[str, str]]:
     provider = os.getenv(f"{role}_PROVIDER", "openai").lower()
-    model = os.getenv(f"{role}_MODEL") or ("gpt-4.1-mini" if role == "ACTOR" else "gpt-4.1-nano")
+    # Fall back to the product's existing AI_ACTOR_MODEL / AI_JUDGE_MODEL settings.
+    model = (os.getenv(f"{role}_MODEL") or os.getenv(f"AI_{role}_MODEL")
+             or ("gpt-4.1-mini" if role == "ACTOR" else "gpt-4.1-nano"))
     if provider == "gigachat":
         return GigaChatLLM(authorization_key=os.getenv("GIGACHAT_AUTH_KEY", ""), model=model), (provider, model)
     if provider in {"openai", "nvidia", "custom"}:
