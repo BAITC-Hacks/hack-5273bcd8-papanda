@@ -44,3 +44,16 @@ def validate_card(card: Card, sources: dict[str, str]) -> None:
         if name == FieldName.contact and field.value:
             raise ValueError("AI must not generate manual contact")
         validate_field(field, sources)
+
+
+def validate_assignments(card: Card, answer_sources: dict[str, str]) -> None:
+    """Do not recycle an answer to one question as evidence for a different field."""
+    source_fields = {source_id: name for name, source_id in answer_sources.items()}
+    for name, field in card.fields.items():
+        for citation in field.sources:
+            assigned = source_fields.get(citation.source_id)
+            if assigned and assigned != name.value:
+                raise ValueError(f"Answer source is assigned to {assigned}, not {name.value}")
+        expected = answer_sources.get(name.value)
+        if field.value and expected and expected not in {s.source_id for s in field.sources}:
+            raise ValueError(f"Field {name.value} must use its explicit current answer source")

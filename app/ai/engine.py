@@ -10,8 +10,8 @@ import time
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.contracts import Card, CardField, Source, GraphNode, GraphEdge, Question, FieldName, FIELD_WEIGHTS
-from .prompts import SYSTEM
-from .validation import validate_field, validate_card
+from .prompts import SYSTEM, FIELD_SEMANTICS, CARD_REVIEW
+from .validation import validate_field, validate_card, validate_assignments
 from .events import emit, SchemaFailure, SourceFailure, SemanticRejection, BudgetExhausted
 
 class Strict(BaseModel):
@@ -210,13 +210,14 @@ async def advance(service, task_id):
         return
     if ctx["round"] == 0:
         raise ValueError("Initial analysis did not produce at least three grounded questions")
-    card_payload = {"sources": ctx["sources"], "world": world.model_dump()}
+    card_payload = {"sources": ctx["sources"], "world": world.model_dump(), "answer_field_sources": ctx["answers"], "field_semantics": FIELD_SEMANTICS}
     while True:
         card = await call(service, task_id, "actor",
-            "COMMIT_CARD: extract only complete sources or complete sentences quoted verbatim into appropriate fields; preserve negation and punctuation. Concatenate multiple cited quotes using spaces. No paraphrasing, invented title or inferred numbers. Missing/conflicting facts stay empty. Contact must be empty. Every nonempty value must have citations and status ai_proposed. Human confirmation happens later. If correction evidence exists, correct only its identified failure.", Card,
+            "COMMIT_CARD: extract only complete sources or complete sentences quoted verbatim into appropriate fields; preserve negation and punctuation. Concatenate multiple cited quotes using spaces. No paraphrasing, invented title or inferred numbers. Missing/conflicting facts stay empty. Contact must be empty. Every nonempty value must have citations and status ai_proposed. Human confirmation happens later. Follow answer_field_sources exactly: an answer belongs only to its specified field, never reuse expected_result as users. Prefer explicit field answers over broad draft. Do not stuff the full generic draft into every field or concatenate irrelevant sentences. Unknown fields stay empty; missing information is valid. interaction_format means business consultations and feedback, NOT prototype UI/integration. If correction evidence exists, actually change the identified invalid field; remove irrelevant text rather than repeating it.", Card,
             card_payload)
         try:
             validate_card(card, ctx["sources"])
+            validate_assignments(card, ctx["answers"])
         except ValueError as exc:
             evidence = {"kind": "source", "failure": str(exc), "invalid_output": card.model_dump()}
             emit(service, task_id, "validation_failed", **evidence)
@@ -225,8 +226,8 @@ async def advance(service, task_id):
             continue
         emit(service, task_id, "card_source_validation_passed", card=card.model_dump())
         review = await call(service, task_id, "judge",
-            "REASSESS proposed card. Check field relevance, unresolved contradictions and faithfully represented answers. Reject inappropriate assignments or unsupported interpretation. Citations prove source provenance, not objective truth. Do not require missing information to be invented.", CardJudgment,
-            {"sources": ctx["sources"], "world": world.model_dump(), "card": card.model_dump()})
+            CARD_REVIEW, CardJudgment,
+            {"sources": ctx["sources"], "world": world.model_dump(), "card": card.model_dump(), "answer_field_sources": ctx["answers"], "field_semantics": FIELD_SEMANTICS})
         emit(service, task_id, "card_semantic_judgment", judgment=review.model_dump())
         if review.accepted:
             break

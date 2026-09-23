@@ -5,7 +5,7 @@ import time
 from uuid import uuid4
 from app.contracts import (Answer, Card, CardField, FieldName, FIELD_WEIGHTS,
     GraphNode, GraphEdge, Question, RunState, Source)
-from .validation import validate_card, contains_contact
+from .validation import validate_card, contains_contact, validate_assignments
 from .events import emit, SchemaFailure, SourceFailure, SemanticRejection, BudgetExhausted
 
 QUESTIONS = {
@@ -153,6 +153,7 @@ class TaskRunService:
         if state.status == "error":
             raise ValueError("Run expired before commit")
         validate_card(card, ctx["sources"])
+        validate_assignments(card, ctx["answers"])
         emit(self, task_id, "card_source_validation_passed", card=card.model_dump())
         task = self.store.get_task(task_id)
         if task.revision != ctx["revision"]:

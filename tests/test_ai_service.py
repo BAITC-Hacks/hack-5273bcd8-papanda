@@ -30,6 +30,25 @@ class GroundingTests(unittest.TestCase):
             validate_field(CardField(value="есть данные",sources=[Source(source_id="draft",quote="есть данные")]),{"draft":source})
         validate_field(CardField(value="Нужен отчёт.",sources=[Source(source_id="draft",quote="Нужен отчёт.")]),{"draft":source})
 
+    def test_observed_expected_result_as_users_is_rejected(self):
+        from app.ai.validation import validate_assignments
+        from app.contracts import Card, FieldName
+        source="Веб-прототип помощника по расписанию с передачей неизвестного вопроса администратору."
+        card=Card();card.fields[FieldName.users]=CardField(value=source,sources=[Source(source_id="answer:result",quote=source)])
+        with self.assertRaisesRegex(ValueError,"expected_result, not users"):
+            validate_assignments(card,{"expected_result":"answer:result"})
+        card.fields[FieldName.users]=CardField()
+        card.fields[FieldName.expected_result]=CardField(value=source,sources=[Source(source_id="answer:result",quote=source)])
+        validate_assignments(card,{"expected_result":"answer:result"})
+        # Missing constraints and interaction_format are valid unknowns.
+        self.assertEqual(card.fields[FieldName.constraints].value,"")
+
+    def test_judge_contract_separates_faithfulness_from_readiness(self):
+        contract=TaskRunService(Store()).contract()
+        self.assertIn("Missing fields alone MUST NEVER cause rejection",contract["card_review_prompt"])
+        self.assertIn("Reject unsupported facts",contract["card_review_prompt"])
+        self.assertIn("НЕ интерфейс",contract["field_semantics"]["interaction_format"])
+
     def test_contract_executes_validation(self):
         self.assertTrue(TaskRunService(Store()).contract()["validation"]["accepted_passed"])
 
