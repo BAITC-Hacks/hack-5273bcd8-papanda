@@ -168,7 +168,7 @@ async def advance(service, task_id):
     payload = {"sources": ctx["sources"], "round": ctx["round"], "previous_world": ctx.get("world"),
                "answered_fields": list(ctx["answers"])}
     world = await call(service, task_id, "actor",
-        "BUILD_WORLD then DEVELOP_OPPOSITION. Assertions must be exact cited user quotations. Business need and student prerequisites are explicitly interpretations. Discover missing prerequisites, ambiguity or actual conflicting assertions. Never force contradictions. Include useful gap candidates if information is missing. Do not ask personal/contact questions. Reassess previous world against new answers; do not repeat answered-field questions.", World, payload)
+        "BUILD_WORLD then DEVELOP_OPPOSITION. Assertions must be entire sources or complete sentences cited verbatim, preserving punctuation and negation. Business need and student prerequisites are explicitly interpretations. Discover missing prerequisites, ambiguity or actual conflicting assertions. Never force contradictions. Include useful gap candidates if information is missing. Do not ask personal/contact questions. Reassess previous world against new answers; do not repeat answered-field questions.", World, payload)
     try:
         validate_world(world, ctx["sources"])
     except ValueError as exc:
@@ -208,7 +208,7 @@ async def advance(service, task_id):
     card_payload = {"sources": ctx["sources"], "world": world.model_dump()}
     while True:
         card = await call(service, task_id, "actor",
-            "COMMIT_CARD: extract only exact user quotations into appropriate fields. Concatenate multiple cited quotes using spaces. No paraphrasing, invented title or inferred numbers. Missing/conflicting facts stay empty. Contact must be empty. Every nonempty value must have citations and status ai_proposed. Human confirmation happens later. If correction evidence exists, correct only its identified failure.", Card,
+            "COMMIT_CARD: extract only complete sources or complete sentences quoted verbatim into appropriate fields; preserve negation and punctuation. Concatenate multiple cited quotes using spaces. No paraphrasing, invented title or inferred numbers. Missing/conflicting facts stay empty. Contact must be empty. Every nonempty value must have citations and status ai_proposed. Human confirmation happens later. If correction evidence exists, correct only its identified failure.", Card,
             card_payload)
         try:
             validate_card(card, ctx["sources"])

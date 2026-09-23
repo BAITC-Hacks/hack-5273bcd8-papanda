@@ -5,7 +5,7 @@ import time
 from uuid import uuid4
 from app.contracts import (Answer, Card, CardField, FieldName, FIELD_WEIGHTS,
     GraphNode, GraphEdge, Question, RunState, Source)
-from .validation import validate_card
+from .validation import validate_card, contains_contact
 from .events import emit, SchemaFailure, SourceFailure, SemanticRejection, BudgetExhausted
 
 QUESTIONS = {
@@ -65,15 +65,22 @@ class TaskRunService:
         mode = mode or os.getenv("AI_MODE", "stub")
         if mode not in {"stub", "engine"}:
             raise ValueError("Unsupported AI mode")
-        state = RunState(task_id=task_id, run_id=uuid4().hex, mode=mode, status="analyzing")
-        self.runs[task_id] = state
-        # Only explicit user sources, excluding contact field and its provenance.
+        contact = task.card.fields[FieldName.contact].value
+        if contains_contact(task.text, contact):
+            raise ValueError("Remove contact details from description; use the manual contact field")
+        # Whitelist live provenance only. Historical edit_UUID sources may be old contacts.
         forbidden = {s.source_id for s in task.card.fields[FieldName.contact].sources}
-        sources = {k: v for k, v in task.sources.items() if k not in forbidden and "contact" not in k.lower()}
+        current_refs = {s.source_id for name, field in task.card.fields.items()
+                        if name != FieldName.contact for s in field.sources}
+        sources = {k: v for k, v in task.sources.items()
+                   if (k.startswith("answer:") or k in current_refs) and k not in forbidden
+                   and not contains_contact(v, contact)}
         sources["draft"] = task.text
         for name, field in task.card.fields.items():
-            if name != FieldName.contact and field.value and field.status in {"edited", "confirmed"}:
+            if name != FieldName.contact and field.value and field.status in {"edited", "confirmed"} and not contains_contact(field.value, contact):
                 sources[f"field:{name.value}"] = field.value
+        state = RunState(task_id=task_id, run_id=uuid4().hex, mode=mode, status="analyzing")
+        self.runs[task_id] = state
         self.contexts[task_id] = dict(sources=sources, round=0, revision=task.revision,
             started=time.monotonic(), deadline=time.monotonic() + max(0.01, float(os.getenv("AI_RUN_TIMEOUT", "900"))), answers={}, base=task.card.model_copy(deep=True))
         if task_id in self.deadlines:
@@ -154,7 +161,7 @@ class TaskRunService:
         for name, proposal in card.fields.items():
             answered = name.value in ctx["answers"]
             if name != FieldName.contact and proposal.value and (answered or task.card.fields[name].status not in {"edited", "confirmed"}):
-                changed = changed or task.card.fields[name].value != proposal.value
+                changed = changed or task.card.fields[name].value != proposal.value or task.card.fields[name].status != "ai_proposed"
                 if answered and task.card.fields[name].value != proposal.value:
                     emit(self, task_id, "human_answer_revises_field", field=name.value, previous=task.card.fields[name].model_dump(), proposal=proposal.model_dump())
                 task.card.fields[name] = proposal.model_copy(update={"status": "ai_proposed"})
@@ -181,6 +188,9 @@ class TaskRunService:
         ids = [a.answer_id for a in answers]
         if len(set(ids)) != len(ids) or set(ids) != set(pending):
             raise ValueError("Supply each current answer_id exactly once (empty answers permitted)")
+        contact = self.store.get_task(task_id).card.fields[FieldName.contact].value
+        if any(contains_contact(a.answer, contact) for a in answers):
+            raise ValueError("Remove contact details from answers; use the manual contact field")
         for answer in answers:
             q = pending[answer.answer_id]
             source_id = f"answer:{answer.answer_id}"

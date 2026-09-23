@@ -24,6 +24,12 @@ class GroundingTests(unittest.TestCase):
     def test_invention_despite_valid_quote(self):
         with self.assertRaises(ValueError):
             validate_field(CardField(value="abc 2025", sources=[Source(source_id="d", quote="abc")]), {"d":"abc"})
+    def test_negation_fragment_rejected_complete_sentence_allowed(self):
+        source="У нас не есть данные, а только предположение. Нужен отчёт."
+        with self.assertRaisesRegex(ValueError,"complete"):
+            validate_field(CardField(value="есть данные",sources=[Source(source_id="draft",quote="есть данные")]),{"draft":source})
+        validate_field(CardField(value="Нужен отчёт.",sources=[Source(source_id="draft",quote="Нужен отчёт.")]),{"draft":source})
+
     def test_contract_executes_validation(self):
         self.assertTrue(TaskRunService(Store()).contract()["validation"]["accepted_passed"])
 
@@ -88,6 +94,34 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             events=[json.loads(line) for line in content.splitlines()]
             self.assertEqual(events[0]["event"],"run_started")
             self.assertEqual(events[-1]["state"]["status"],"waiting_answers")
+
+    async def test_obsolete_contact_source_is_not_in_model_payload(self):
+        from app.contracts import FieldName
+        self.store.task.sources={"edit_random_old":"old@example.com","edit_noncontact_current":"Проверенные сведения","answer:old":"Сведения ответа"}
+        self.store.task.card.fields[FieldName.context]=CardField(value="Проверенные сведения",status="confirmed",sources=[Source(source_id="edit_noncontact_current",quote="Проверенные сведения")])
+        self.service.start("t","stub");await self.advance()
+        sources=self.service.contexts["t"]["sources"]
+        self.assertNotIn("edit_random_old",sources)
+        self.assertIn("edit_noncontact_current",sources)
+        self.assertIn("answer:old",sources)
+
+    async def test_identical_answer_downgrade_unpublishes(self):
+        from app.contracts import Card, FieldName
+        self.store.task.status="published";self.store.task.published_at="now"
+        self.store.task.card.fields[FieldName.data]=CardField(value="История продаж",status="confirmed")
+        self.service.start("t","stub");await self.advance()
+        ctx=self.service.contexts["t"];ctx["sources"]["answer:new"]="История продаж";ctx["answers"]["data"]="answer:new"
+        card=Card();card.fields[FieldName.data]=CardField(value="История продаж",sources=[Source(source_id="answer:new",quote="История продаж")])
+        self.service._commit("t",card)
+        self.assertEqual(self.store.task.status,"draft")
+        self.assertIsNone(self.store.task.published_at)
+        self.assertEqual(self.store.task.card.fields[FieldName.data].status,"ai_proposed")
+
+    async def test_contact_in_free_text_rejected_before_run(self):
+        self.store.task.text="Нужен отчёт. Пишите old@example.com"
+        with self.assertRaisesRegex(ValueError,"contact"):
+            self.service.start("t","engine")
+        self.assertNotIn("t",self.service.runs)
 
     async def test_stale_question_ids(self):
         self.service.start("t", "stub"); await self.advance()
