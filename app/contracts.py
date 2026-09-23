@@ -140,7 +140,7 @@ class Graph(Model):
 class RunState(Model):
     task_id: str
     run_id: str = ""
-    mode: Literal["stub", "engine", "replay"] = "stub"
+    mode: Literal["stub", "engine", "replay", "light", "heavy"] = "stub"
     status: Literal["idle", "analyzing", "waiting_answers", "building_card", "card_ready", "error"] = "idle"
     stop_reason: str | None = None
     pending_questions: list[Question] = Field(default_factory=list)
@@ -158,7 +158,7 @@ class TaskCreate(Model):
 
 
 class AnalyzeRequest(Model):
-    mode: Literal["stub", "engine"] | None = None
+    mode: Literal["stub", "engine", "light", "heavy"] | None = None
 
 
 class AnswersRequest(Model):

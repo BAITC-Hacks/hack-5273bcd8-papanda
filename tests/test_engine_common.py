@@ -24,6 +24,12 @@ def test_bad_quote_and_no_source():
     assert any(e["code"] == "missing_source" for e in validate_card(card, {"draft": "Нужен бот"}))
 
 
+def test_negation_cannot_be_dropped():
+    card = CardDraft(fields={"data": CardField(value="Данные доступны",
+                                                sources=[Source(source_id="draft", quote="Данные пока недоступны")])})
+    assert any(e["code"] == "negation_lost" for e in validate_card(card, {"draft": "Данные пока недоступны"}))
+
+
 def test_normalization_and_null():
     card = CardDraft(fields={"context": CardField(value="Это проект", sources=[Source(source_id="draft", quote="ЁТО  ПРОЕКТ")]),
                              "contact": CardField(value=None)})

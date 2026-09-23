@@ -63,7 +63,9 @@ class TaskRunService:
         if self.get(task_id).status in {"analyzing", "building_card", "waiting_answers"}:
             raise ValueError("A run is already active")
         mode = mode or os.getenv("AI_MODE", "stub")
-        if mode not in {"stub", "engine"}:
+        if mode == "engine" and os.getenv("ENGINE") in {"light", "heavy"}:
+            mode = os.environ["ENGINE"]
+        if mode not in {"stub", "engine", "light", "heavy"}:
             raise ValueError("Unsupported AI mode")
         contact = task.card.fields[FieldName.contact].value
         if contains_contact(task.text, contact):
@@ -88,7 +90,8 @@ class TaskRunService:
         self.deadlines[task_id] = asyncio.get_running_loop().call_later(
             max(0.0, self.contexts[task_id]["deadline"] - time.monotonic()), self._expire, task_id)
         emit(self, task_id, "run_started", state=state.model_dump())
-        self.jobs[task_id] = asyncio.create_task(self._advance(task_id))
+        self.jobs[task_id] = asyncio.create_task(
+            self._advance_external(task_id) if mode in {"light", "heavy"} else self._advance(task_id))
         return state
 
     async def _advance(self, task_id):
@@ -114,6 +117,72 @@ class TaskRunService:
         finally:
             state.elapsed_seconds = round(time.monotonic() - ctx["started"], 3)
             emit(self, task_id, "state_transition", state=state.model_dump())
+
+    async def _advance_external(self, task_id):
+        """Translate either frozen engine contract into the existing product API."""
+        from engines import get_engine
+        from engines.common.contracts import StartRequest
+        state, ctx = self.runs[task_id], self.contexts[task_id]
+        engine = None
+        try:
+            engine = get_engine(state.mode)
+            task = self.store.get_task(task_id)
+            engine_id = await engine.start(StartRequest(
+                task_id=task_id, draft=task.text, industry=task.industry,
+                field_weights=FIELD_WEIGHTS,
+            ))
+            ctx["engine_id"] = engine_id
+            ctx["engine"] = engine
+            while True:
+                view = engine.view(engine_id)
+                self._copy_external_view(state, view)
+                if view.status == "card_ready":
+                    card = Card()
+                    for name, field in (view.card.fields if view.card else {}).items():
+                        if field.value:
+                            card.fields[FieldName(name)] = CardField(
+                                value=field.value, status="ai_proposed",
+                                sources=[Source(source_id=s.source_id, quote=s.quote) for s in field.sources],
+                            )
+                    self._commit(task_id, card)
+                    break
+                if view.status in {"failed", "cancelled"}:
+                    state.status = "error"
+                    state.error = view.error or "Движок остановлен; карточка не создана"
+                    state.stop_reason = view.stop_reason or view.status
+                    break
+                await asyncio.sleep(0.1)
+        except asyncio.CancelledError:
+            if engine is not None and ctx.get("engine_id"):
+                await engine.cancel(ctx["engine_id"])
+            raise
+        except Exception as exc:
+            state.status = "error"
+            state.stop_reason = "engine_bridge_error"
+            state.error = f"Движок остановлен ({type(exc).__name__}); карточка не создана"
+            emit(self, task_id, "engine_bridge_error", exception_type=type(exc).__name__)
+        finally:
+            state.elapsed_seconds = round(time.monotonic() - ctx["started"], 3)
+            emit(self, task_id, "state_transition", state=state.model_dump())
+
+    @staticmethod
+    def _copy_external_view(state, view):
+        from app.contracts import Graph
+        state.status = "error" if view.status in {"failed", "cancelled"} else view.status
+        state.pending_questions = [Question(
+            answer_id=q.question_id, field=FieldName(q.field), question=q.text,
+            why=q.why, points_at_stake=q.points_at_stake, node_id=q.question_id,
+        ) for q in view.pending_questions]
+        state.graph = Graph(
+            nodes=[GraphNode(id=n.id, kind=n.kind, label=n.label,
+                             status=n.status or "proposed") for n in view.graph.nodes],
+            edges=[GraphEdge(source=e.source, target=e.target, label=e.kind) for e in view.graph.edges],
+        )
+        state.calls = int(view.metrics.get("llm_calls", 0))
+        state.tokens = {role: sum(value for value in usage.values() if isinstance(value, int))
+                        for role, usage in view.metrics.get("tokens_by_role", {}).items()
+                        if isinstance(usage, dict)}
+        state.elapsed_seconds = float(view.metrics.get("elapsed_s", 0))
 
     def _stub(self, task_id):
         state, ctx = self.runs[task_id], self.contexts[task_id]
@@ -192,6 +261,24 @@ class TaskRunService:
         contact = self.store.get_task(task_id).card.fields[FieldName.contact].value
         if any(contains_contact(a.answer, contact) for a in answers):
             raise ValueError("Remove contact details from answers; use the manual contact field")
+        if state.mode in {"light", "heavy"}:
+            from engines.common.contracts import Answer as EngineAnswer
+            engine = ctx.get("engine")
+            engine_id = ctx.get("engine_id")
+            if engine is None or engine_id is None:
+                raise ValueError("Движок ещё не готов принять ответы")
+            converted = []
+            for answer in answers:
+                q = pending[answer.answer_id]
+                index = ctx.setdefault("external_answer_index", 0) + 1
+                ctx["external_answer_index"] = index
+                source_id = f"A{index}"
+                ctx["sources"][source_id] = answer.answer
+                ctx["answers"][q.field.value] = source_id
+                converted.append(EngineAnswer(question_id=answer.answer_id, text=answer.answer))
+            await engine.submit_answers(engine_id, converted)
+            self._copy_external_view(state, engine.view(engine_id))
+            return state
         for answer in answers:
             q = pending[answer.answer_id]
             source_id = f"answer:{answer.answer_id}"

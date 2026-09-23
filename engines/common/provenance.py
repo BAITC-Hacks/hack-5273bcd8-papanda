@@ -57,6 +57,9 @@ def validate_card(card: CardDraft, sources: dict[str, str]) -> list[dict]:
         if not quoted:
             continue
         evidence = normalize(" ".join(quoted))
+        negation = re.compile(r"\b(?:нет|не|нельзя|невозможно|недоступн\w*|отсутств\w*|пока)\b")
+        if negation.search(evidence) and not negation.search(normalize(value)):
+            errors.append({"field": field, "code": "negation_lost", "message": "Пересказ утратил отрицание или оговорку из источника"})
         for fact in _facts(value):
             if normalize(fact) not in evidence:
                 errors.append({"field": field, "code": "ungrounded_fact", "message": f"Факт «{fact}» отсутствует в цитатах"})

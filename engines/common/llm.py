@@ -63,6 +63,7 @@ class OpenAICompatibleLLM:
         body: dict[str, Any] = {"model": self.model, "messages": messages, "max_tokens": max_tokens}
         if json_schema is not None:
             body["response_format"] = {"type": "json_object"}
+            body["messages"] = [{"role": "system", "content": "Верни только корректный JSON-объект."}, *messages]
         verify = os.getenv("OPENAI_CA_BUNDLE") or True
         async with httpx.AsyncClient(timeout=timeout, verify=verify) as client:
             for attempt in range(3):
@@ -76,7 +77,10 @@ class OpenAICompatibleLLM:
                         continue
                     response.raise_for_status()
                     payload = response.json()
-                    text = payload["choices"][0]["message"]["content"]
+                    choice = payload["choices"][0]
+                    if choice.get("finish_reason") == "length" or choice["message"].get("refusal"):
+                        raise ProviderError("Ответ модели усечён или отклонён")
+                    text = choice["message"]["content"]
                     if not isinstance(text, str) or not text.strip():
                         raise ProviderError("Провайдер вернул пустой ответ")
                     return LLMResult(text=text, usage=payload.get("usage") or {})
@@ -131,7 +135,7 @@ class GigaChatLLM:
             token = await self._access_token(client)
             body: dict[str, Any] = {"model": self.model, "messages": messages, "max_tokens": max_tokens}
             if json_schema is not None:
-                body["function_call"] = "none"
+                body["messages"] = [{"role": "system", "content": "Верни только корректный JSON-объект."}, *messages]
             for attempt in range(3):
                 try:
                     response = await client.post(

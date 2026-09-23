@@ -19,8 +19,8 @@ def create_app(db_path=None, ai_mode=None):
     root = Path(__file__).resolve().parents[2]
     load_dotenv(root / ".env")
     mode = ai_mode or os.getenv("AI_MODE", "stub")
-    if mode not in {"stub", "engine"}:
-        raise ValueError("AI_MODE must be stub or engine")
+    if mode not in {"stub", "engine", "light", "heavy"}:
+        raise ValueError("AI_MODE must be stub, engine, light or heavy")
     store = Store(str(db_path or os.getenv("SANA_DB") or os.getenv("DB_PATH") or root / "data" / "sana.db"))
     try:
         store.seed()
@@ -64,7 +64,8 @@ def create_app(db_path=None, ai_mode=None):
 
     @app.get("/api/health")
     async def health():
-        return {"status": "ok", "ai_mode": mode, "version": 1}
+        selected = os.getenv("ENGINE") if mode == "engine" and os.getenv("ENGINE") in {"light", "heavy"} else mode
+        return {"status": "ok", "ai_mode": selected, "version": 1}
 
     @app.post("/api/tasks", status_code=201)
     async def create_task(body: TaskCreate):

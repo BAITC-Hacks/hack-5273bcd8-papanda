@@ -53,7 +53,7 @@ def contract(engine: str = "light"):
     selected = get_engine(engine)
     return {"engine": engine, "input_schema": StartRequest.model_json_schema(),
             "output_schema": RunView.model_json_schema(),
-            "prompts": selected.prompts(), "malformed_example": selected.malformed_example()}
+            **selected.contract()}
 
 
 @app.get("/engine/health")
